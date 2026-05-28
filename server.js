@@ -4,7 +4,8 @@ const app = express();
 app.use(express.json());
 
 const BOT_TOKEN = "8826928537:AAGZ0XvuXFPGfrRKgzfk8moflN56hoqXwf0";
-const CHAT_ID = "-1001936075305";
+const CHAT_ID = "-1002226440487";
+const THREAD_ID = "3689";
 const API_KEY = "apk-4228c5cf3a3f3375ab5aa3f707291688.9c5dd3ebad49b61d083a5a2e01f624da6cb8d34248c0124a6d202fd0952f82e0";
 
 // Tracks bid count per product
@@ -74,9 +75,9 @@ async function checkForNewBids() {
         ].join("\n");
 
         await axios.post(
-          `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-          { chat_id: CHAT_ID, text: message }
-        );
+  `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+  { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: message }
+);
 
         console.log(`✅ New bid on "${productTitle}" sent to Telegram!`);
       } else {
