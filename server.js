@@ -44,27 +44,6 @@ if (!initialized) {
   return;
 }
 
-// Check autobids
-if (autoBids.length > lastSeenAutoBidCount && latestAutoBid) {
-  lastSeenAutoBidCount = autoBids.length;
-
-  const message = [
-    "🔨 NEW BID PLACED!",
-    "",
-    `📦 Item: Testing`,
-    `👤 Bidder: ${latestAutoBid.customer_first_name[0]}*** ${latestAutoBid.customer_last_name[0]}***`,
-    `💰 Bid: ${latestAutoBid.currency} ${latestAutoBid.bid}`,
-    `📈 Highest Bid: ${latestAutoBid.currency} ${auction.highest_bid}`,
-    `🏁 Total Bids: ${auction.bid_count}`,
-    `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`
-  ].join("\n");
-
-  await axios.post(
-    `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-    { chat_id: CHAT_ID, text: message }
-  );
-  console.log("✅ New auto bid sent to Telegram!");
-}
 
 // Only alert if bid count increased
 if (auction.bid_count > lastSeenBidCount) {
@@ -74,7 +53,7 @@ if (auction.bid_count > lastSeenBidCount) {
         "🔨 NEW BID PLACED!",
         "",
         `📦 Item: Testing`,
-        `👤 Bidder: ${latestBid.customer_first_name[0]}*** ${latestBid.customer_last_name[0]}***`,
+        `👤 Bidder: ${latestBid.customer_first_name[0]}${'*'.repeat(latestBid.customer_first_name.length - 1)} ${latestBid.customer_last_name[0]}${'*'.repeat(latestBid.customer_last_name.length - 1)}`,
         `💰 Bid: ${latestBid.currency} ${latestBid.bid}`,
         `📈 Highest Bid: ${latestBid.currency} ${auction.highest_bid}`,
         `🏁 Total Bids: ${auction.bid_count}`,
