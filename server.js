@@ -8,13 +8,11 @@ const CHAT_ID = process.env.CHAT_ID;
 const THREAD_ID = process.env.THREAD_ID;
 const API_KEY = process.env.API_KEY;
 
-// Tracks bid count per product
 const bidCounts = {};
 let initialized = false;
 
 async function checkForNewBids() {
   try {
-    // Step 1: Get all active auctions
     const listResponse = await axios.get(
       `https://auction-api.tunnelpacket.com/api/auctions?status=active`,
       { headers: { Authorization: `Bearer ${API_KEY}` } }
@@ -27,12 +25,10 @@ async function checkForNewBids() {
       return;
     }
 
-    // Step 2: Check each auction for new bids
     for (const auctionSummary of auctions) {
       const productId = auctionSummary.shopify_product_id;
       const productTitle = auctionSummary.shopify_product_title;
 
-      // Get full auction details with bids
       const detailResponse = await axios.get(
         `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
         { headers: { Authorization: `Bearer ${API_KEY}` } }
@@ -41,19 +37,16 @@ async function checkForNewBids() {
       const auction = detailResponse.data.auction;
       const bids = detailResponse.data.auction_bids || [];
 
-      // First run — just record counts, don't alert
       if (!initialized) {
         bidCounts[productId] = auction.bid_count;
         continue;
       }
 
-      // Initialize new auctions added after startup
       if (bidCounts[productId] === undefined) {
         bidCounts[productId] = auction.bid_count;
         continue;
       }
 
-      // Check if new bid placed
       if (auction.bid_count > bidCounts[productId]) {
         bidCounts[productId] = auction.bid_count;
 
@@ -75,9 +68,9 @@ async function checkForNewBids() {
         ].join("\n");
 
         await axios.post(
-  `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-  { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: message }
-);
+          `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+          { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: message }
+        );
 
         console.log(`✅ New bid on "${productTitle}" sent to Telegram!`);
       } else {
