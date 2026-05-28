@@ -30,6 +30,7 @@ const bids = response.data.auction_bids || [];
     }
 
     const latestBid = bids[bids.length - 1];
+    const secondLatestBid = bids[bids.length - 2];
     const latestBidDate = new Date(latestBid.bid_date).getTime();
 
 const autoBids = response.data.automatic_bids || [];
@@ -54,8 +55,8 @@ if (auction.bid_count > lastSeenBidCount) {
         "",
         `📦 Item: Testing`,
         `👤 Bidder: ${latestBid.customer_first_name[0]}${'*'.repeat(latestBid.customer_first_name.length - 1)} ${latestBid.customer_last_name[0]}${'*'.repeat(latestBid.customer_last_name.length - 1)}`,
-        `💰 Bid: ${latestBid.currency} ${latestBid.bid}`,
-        `📈 Highest Bid: ${latestBid.currency} ${auction.highest_bid}`,
+        `💰 Previous Bid: ${latestBid.currency} ${secondLatestBid ? secondLatestBid.bid : '-'}`,
+        `📈 Current Bid: ${latestBid.currency} ${auction.highest_bid}`,
         `🏁 Total Bids: ${auction.bid_count}`,
         `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
       ].join("\n");
