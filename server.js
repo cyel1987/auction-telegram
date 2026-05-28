@@ -95,7 +95,7 @@ async function checkForNewBids() {
   }
 }
 
-setInterval(checkForNewBids, 30000);
+setInterval(checkForNewBids, 10000);
 checkForNewBids();
 
 app.get("/", (req, res) => {
