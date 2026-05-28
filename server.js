@@ -8,8 +8,8 @@ const CHAT_ID = "-1001936075305";
 const API_KEY = "apk-067bf7704db3a98885dabee44798e1d2.f540a1dc8febb4ea40a12836c1249124e452a449d69a5e2b73964921a226146a";
 const PRODUCT_ID = "10395060076860";
 
-let lastBidCount = 0;
-let lastHighestBid = 0;
+let lastSeenBidDate = null;
+let initialized = false;
 
 async function checkForNewBids() {
   try {
@@ -20,11 +20,27 @@ async function checkForNewBids() {
 
     const auction = response.data.auction;
     const bids = response.data.auction_bids || [];
-    const latestBid = bids[bids.length - 1];
 
-    if (auction.bid_count > lastBidCount && latestBid) {
-      lastBidCount = auction.bid_count;
-      lastHighestBid = auction.highest_bid;
+    if (bids.length === 0) {
+      initialized = true;
+      console.log("No bids yet.");
+      return;
+    }
+
+    const latestBid = bids[bids.length - 1];
+    const latestBidDate = new Date(latestBid.bid_date).getTime();
+
+    // First run — just record the latest bid date, don't alert
+    if (!initialized) {
+      lastSeenBidDate = latestBidDate;
+      initialized = true;
+      console.log("✅ Initialized. Watching for NEW bids from now...");
+      return;
+    }
+
+    // Only alert if bid is newer than what we last saw
+    if (latestBidDate > lastSeenBidDate) {
+      lastSeenBidDate = latestBidDate;
 
       const message = [
         "🔨 NEW BID PLACED!",
@@ -44,16 +60,15 @@ async function checkForNewBids() {
 
       console.log("✅ New bid sent to Telegram!");
     } else {
-      console.log(`No new bids. Current count: ${auction.bid_count}`);
+      console.log(`No new bids. Total: ${auction.bid_count}`);
     }
   } catch (err) {
     console.log("❌ Error:", err.message);
   }
 }
 
-// Check every 30 seconds
 setInterval(checkForNewBids, 30000);
-checkForNewBids(); // Run immediately on start
+checkForNewBids();
 
 app.listen(3000, () => {
   console.log("🚀 Server running on port 3000");
