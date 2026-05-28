@@ -9,6 +9,7 @@ const API_KEY = "apk-4228c5cf3a3f3375ab5aa3f707291688.9c5dd3ebad49b61d083a5a2e01
 const PRODUCT_ID = "10395060076860";
 
 let lastSeenBidCount = 0;
+let lastSeenAutoBidCount = 0;
 let initialized = false;
 
 async function checkForNewBids() {
@@ -31,17 +32,44 @@ const bids = response.data.auction_bids || [];
     const latestBid = bids[bids.length - 1];
     const latestBidDate = new Date(latestBid.bid_date).getTime();
 
- // First run — just record the current bid count, don't alert
+const autoBids = response.data.automatic_bids || [];
+const latestAutoBid = autoBids[autoBids.length - 1];
+
+// First run — just record counts, don't alert
 if (!initialized) {
   lastSeenBidCount = auction.bid_count;
+  lastSeenAutoBidCount = autoBids.length;
   initialized = true;
   console.log(`✅ Initialized. Watching for NEW bids from now... Current count: ${auction.bid_count}`);
   return;
 }
 
+// Check autobids
+if (autoBids.length > lastSeenAutoBidCount && latestAutoBid) {
+  lastSeenAutoBidCount = autoBids.length;
+
+  const message = [
+    "🔨 NEW BID PLACED!",
+    "",
+    `📦 Item: Testing`,
+    `👤 Bidder: ${latestAutoBid.customer_first_name[0]}*** ${latestAutoBid.customer_last_name[0]}***`,
+    `💰 Bid: ${latestAutoBid.currency} ${latestAutoBid.bid}`,
+    `📈 Highest Bid: ${latestAutoBid.currency} ${auction.highest_bid}`,
+    `🏁 Total Bids: ${auction.bid_count}`,
+    `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`
+  ].join("\n");
+
+  await axios.post(
+    `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+    { chat_id: CHAT_ID, text: message }
+  );
+  console.log("✅ New auto bid sent to Telegram!");
+}
+
 // Only alert if bid count increased
 if (auction.bid_count > lastSeenBidCount) {
-  lastSeenBidCount = auction.bid_count;
+  lastSeenBidCount = auction.bid_count; 
+
       const message = [
         "🔨 NEW BID PLACED!",
         "",
