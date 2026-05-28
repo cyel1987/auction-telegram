@@ -46,11 +46,11 @@ if (auction.bid_count > lastSeenBidCount) {
         "🔨 NEW BID PLACED!",
         "",
         `📦 Item: Testing`,
-        `👤 Bidder: ${latestBid.customer_email}`,
+        `👤 Bidder: ${latestBid.customer_first_name} ${latestBid.customer_last_name}`,
         `💰 Bid: ${latestBid.currency} ${latestBid.bid}`,
         `📈 Highest Bid: ${latestBid.currency} ${auction.highest_bid}`,
         `🏁 Total Bids: ${auction.bid_count}`,
-        `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG")}`
+        `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
       ].join("\n");
 
       await axios.post(
