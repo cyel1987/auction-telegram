@@ -6,71 +6,89 @@ app.use(express.json());
 const BOT_TOKEN = "8826928537:AAGZ0XvuXFPGfrRKgzfk8moflN56hoqXwf0";
 const CHAT_ID = "-1001936075305";
 const API_KEY = "apk-4228c5cf3a3f3375ab5aa3f707291688.9c5dd3ebad49b61d083a5a2e01f624da6cb8d34248c0124a6d202fd0952f82e0";
-const PRODUCT_ID = "10395060076860";
 
-let lastSeenBidCount = 0;
-let lastSeenAutoBidCount = 0;
+// Tracks bid count per product
+const bidCounts = {};
 let initialized = false;
 
 async function checkForNewBids() {
   try {
-    const response = await axios.get(
-      `https://auction-api.tunnelpacket.com/api/auction/${PRODUCT_ID}`,
+    // Step 1: Get all active auctions
+    const listResponse = await axios.get(
+      `https://auction-api.tunnelpacket.com/api/auctions?status=active`,
       { headers: { Authorization: `Bearer ${API_KEY}` } }
     );
 
-    const auction = response.data.auction;
-const bids = response.data.auction_bids || [];
-
-
-    if (bids.length === 0) {
+    const auctions = listResponse.data;
+    if (!auctions || auctions.length === 0) {
+      console.log("No active auctions found.");
       initialized = true;
-      console.log("No bids yet.");
       return;
     }
 
-    const sortedBids = bids.sort((a, b) => new Date(a.bid_date) - new Date(b.bid_date));
-    const latestBid = sortedBids[sortedBids.length - 1];
-    const secondLatestBid = sortedBids[sortedBids.length - 2];
-    const latestBidDate = new Date(latestBid.bid_date).getTime();
+    // Step 2: Check each auction for new bids
+    for (const auctionSummary of auctions) {
+      const productId = auctionSummary.shopify_product_id;
+      const productTitle = auctionSummary.shopify_product_title;
 
-const autoBids = response.data.automatic_bids || [];
-const latestAutoBid = autoBids[autoBids.length - 1];
-
-// First run — just record counts, don't alert
-if (!initialized) {
-  lastSeenBidCount = auction.bid_count;
-  lastSeenAutoBidCount = autoBids.length;
-  initialized = true;
-  console.log(`✅ Initialized. Watching for NEW bids from now... Current count: ${auction.bid_count}`);
-  return;
-}
-
-
-// Only alert if bid count increased
-if (auction.bid_count > lastSeenBidCount) {
-  lastSeenBidCount = auction.bid_count; 
-
-      const message = [
-        "🔨 NEW BID PLACED!",
-        "",
-        `📦 Item: Testing`,
-        `👤 Bidder: ${latestBid.customer_first_name[0]}${'*'.repeat(latestBid.customer_first_name.length - 1)} ${latestBid.customer_last_name[0]}${'*'.repeat(latestBid.customer_last_name.length - 1)}`,
-        `💰 Previous Bid: ${latestBid.currency} ${secondLatestBid ? secondLatestBid.bid : '-'}`,
-        `📈 Current Bid: ${latestBid.currency} ${auction.highest_bid}`,
-        `🏁 Total Bids: ${auction.bid_count}`,
-        `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
-      ].join("\n");
-
-      await axios.post(
-        `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-        { chat_id: CHAT_ID, text: message }
+      // Get full auction details with bids
+      const detailResponse = await axios.get(
+        `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
+        { headers: { Authorization: `Bearer ${API_KEY}` } }
       );
 
-      console.log("✅ New bid sent to Telegram!");
-    } else {
-      console.log(`No new bids. Total: ${auction.bid_count}`);
+      const auction = detailResponse.data.auction;
+      const bids = detailResponse.data.auction_bids || [];
+
+      // First run — just record counts, don't alert
+      if (!initialized) {
+        bidCounts[productId] = auction.bid_count;
+        continue;
+      }
+
+      // Initialize new auctions added after startup
+      if (bidCounts[productId] === undefined) {
+        bidCounts[productId] = auction.bid_count;
+        continue;
+      }
+
+      // Check if new bid placed
+      if (auction.bid_count > bidCounts[productId]) {
+        bidCounts[productId] = auction.bid_count;
+
+        const sortedBids = bids.sort((a, b) => new Date(a.bid_date) - new Date(b.bid_date));
+        const latestBid = sortedBids[sortedBids.length - 1];
+        const secondLatestBid = sortedBids[sortedBids.length - 2];
+
+        if (!latestBid) continue;
+
+        const message = [
+          "🔨 NEW BID PLACED!",
+          "",
+          `📦 Item: ${productTitle}`,
+          `👤 Bidder: ${latestBid.customer_first_name[0]}${'*'.repeat(latestBid.customer_first_name.length - 1)} ${latestBid.customer_last_name[0]}${'*'.repeat(latestBid.customer_last_name.length - 1)}`,
+          `💰 Previous Bid: ${latestBid.currency} ${secondLatestBid ? secondLatestBid.bid : '-'}`,
+          `📈 Current Bid: ${latestBid.currency} ${auction.highest_bid}`,
+          `🏁 Total Bids: ${auction.bid_count}`,
+          `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
+        ].join("\n");
+
+        await axios.post(
+          `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+          { chat_id: CHAT_ID, text: message }
+        );
+
+        console.log(`✅ New bid on "${productTitle}" sent to Telegram!`);
+      } else {
+        console.log(`No new bids on "${productTitle}". Total: ${auction.bid_count}`);
+      }
     }
+
+    if (!initialized) {
+      initialized = true;
+      console.log(`✅ Initialized. Watching ${auctions.length} active auction(s)...`);
+    }
+
   } catch (err) {
     console.log("❌ Error:", err.message);
   }
