@@ -8,7 +8,7 @@ const CHAT_ID = "-1001936075305";
 const API_KEY = "apk-4228c5cf3a3f3375ab5aa3f707291688.9c5dd3ebad49b61d083a5a2e01f624da6cb8d34248c0124a6d202fd0952f82e0";
 const PRODUCT_ID = "10395060076860";
 
-let lastSeenBidDate = null;
+let lastSeenBidCount = 0;
 let initialized = false;
 
 async function checkForNewBids() {
@@ -31,18 +31,17 @@ const bids = response.data.auction_bids || [];
     const latestBid = bids[bids.length - 1];
     const latestBidDate = new Date(latestBid.bid_date).getTime();
 
-    // First run — just record the latest bid date, don't alert
-    if (!initialized) {
-      lastSeenBidDate = latestBidDate;
-      initialized = true;
-      console.log("✅ Initialized. Watching for NEW bids from now...");
-      return;
-    }
+ // First run — just record the current bid count, don't alert
+if (!initialized) {
+  lastSeenBidCount = auction.bid_count;
+  initialized = true;
+  console.log(`✅ Initialized. Watching for NEW bids from now... Current count: ${auction.bid_count}`);
+  return;
+}
 
-    // Only alert if bid is newer than what we last saw
-    if (latestBidDate > lastSeenBidDate) {
-      lastSeenBidDate = latestBidDate;
-
+// Only alert if bid count increased
+if (auction.bid_count > lastSeenBidCount) {
+  lastSeenBidCount = auction.bid_count;
       const message = [
         "🔨 NEW BID PLACED!",
         "",
