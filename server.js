@@ -3,10 +3,10 @@ const axios = require("axios");
 const app = express();
 app.use(express.json());
 
-const BOT_TOKEN = "8826928537:AAGZ0XvuXFPGfrRKgzfk8moflN56hoqXwf0";
-const CHAT_ID = "-1002226440487";
-const THREAD_ID = "3689";
-const API_KEY = "apk-4228c5cf3a3f3375ab5aa3f707291688.9c5dd3ebad49b61d083a5a2e01f624da6cb8d34248c0124a6d202fd0952f82e0";
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const CHAT_ID = process.env.CHAT_ID;
+const THREAD_ID = process.env.THREAD_ID;
+const API_KEY = process.env.API_KEY;
 
 // Tracks bid count per product
 const bidCounts = {};
