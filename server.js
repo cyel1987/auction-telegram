@@ -21,17 +21,6 @@ async function checkForNewBids() {
     const auction = response.data.auction;
 const bids = response.data.auction_bids || [];
 
-// Get product title
-let productTitle = "Auction Item";
-try {
-  const listRes = await axios.get(
-    `https://auction-api.tunnelpacket.com/api/auctions?shopify_product_ids=${PRODUCT_ID}`,
-    { headers: { Authorization: `Bearer ${API_KEY}` } }
-  );
-  if (listRes.data && listRes.data[0]) {
-    productTitle = listRes.data[0].shopify_product_title;
-  }
-} catch (e) {}
 
     if (bids.length === 0) {
       initialized = true;
@@ -57,7 +46,7 @@ try {
       const message = [
         "🔨 NEW BID PLACED!",
         "",
-        `📦 Item: ${productTitle}`,
+        `📦 Item: Testing`,
         `👤 Bidder: ${latestBid.customer_email}`,
         `💰 Bid: ${latestBid.currency} ${latestBid.bid}`,
         `📈 Highest Bid: ${latestBid.currency} ${auction.highest_bid}`,
