@@ -29,8 +29,9 @@ const bids = response.data.auction_bids || [];
       return;
     }
 
-    const latestBid = bids[bids.length - 1];
-    const secondLatestBid = bids[bids.length - 2];
+    const sortedBids = bids.sort((a, b) => new Date(a.bid_date) - new Date(b.bid_date));
+    const latestBid = sortedBids[sortedBids.length - 1];
+    const secondLatestBid = sortedBids[sortedBids.length - 2];
     const latestBidDate = new Date(latestBid.bid_date).getTime();
 
 const autoBids = response.data.automatic_bids || [];
