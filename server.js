@@ -5,7 +5,7 @@ app.use(express.json());
 
 const BOT_TOKEN = "8826928537:AAGZ0XvuXFPGfrRKgzfk8moflN56hoqXwf0";
 const CHAT_ID = "-1001936075305";
-const API_KEY = "apk-067bf7704db3a98885dabee44798e1d2.f540a1dc8febb4ea40a12836c1249124e452a449d69a5e2b73964921a226146a";
+const API_KEY = "apk-4228c5cf3a3f3375ab5aa3f707291688.9c5dd3ebad49b61d083a5a2e01f624da6cb8d34248c0124a6d202fd0952f82e0";
 const PRODUCT_ID = "10395060076860";
 
 let lastSeenBidDate = null;
