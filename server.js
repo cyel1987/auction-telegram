@@ -3,7 +3,7 @@ const axios = require("axios");
 const app = express();
 app.use(express.json());
 
-const BOT_TOKEN = "8826928537:AAEdxNbB6Ie5emOQ917CBE2p8t22fypAEb4";
+const BOT_TOKEN = "8826928537:AAGZ0XvuXFPGfrRKgzfk8moflN56hoqXwf0";
 const CHAT_ID = "-1001936075305";
 const API_KEY = "apk-067bf7704db3a98885dabee44798e1d2.f540a1dc8febb4ea40a12836c1249124e452a449d69a5e2b73964921a226146a";
 const PRODUCT_ID = "10395060076860";
