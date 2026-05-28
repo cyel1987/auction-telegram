@@ -46,7 +46,7 @@ if (auction.bid_count > lastSeenBidCount) {
         "🔨 NEW BID PLACED!",
         "",
         `📦 Item: Testing`,
-        `👤 Bidder: ${latestBid.customer_first_name} ${latestBid.customer_last_name}`,
+        `👤 Bidder: ${latestBid.customer_first_name[0]}*** ${latestBid.customer_last_name[0]}***`,
         `💰 Bid: ${latestBid.currency} ${latestBid.bid}`,
         `📈 Highest Bid: ${latestBid.currency} ${auction.highest_bid}`,
         `🏁 Total Bids: ${auction.bid_count}`,
