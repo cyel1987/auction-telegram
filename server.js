@@ -10,6 +10,7 @@ const API_KEY = process.env.API_KEY;
 
 // Tracks bid count per product
 const bidCounts = {};
+const auctionStatuses = {};
 let initialized = false;
 
 async function checkForNewBids() {
@@ -44,12 +45,14 @@ async function checkForNewBids() {
       // First run — just record counts, don't alert
       if (!initialized) {
         bidCounts[productId] = auction.bid_count;
+        auctionStatuses[productId] = auctionSummary.status;
         continue;
       }
 
       // Initialize new auctions added after startup
       if (bidCounts[productId] === undefined) {
         bidCounts[productId] = auction.bid_count;
+        auctionStatuses[productId] = auctionSummary.status;
         continue;
       }
 
@@ -80,8 +83,32 @@ async function checkForNewBids() {
 );
 
         console.log(`✅ New bid on "${productTitle}" sent to Telegram!`);
-      } else {
+       } else {
         console.log(`No new bids on "${productTitle}". Total: ${auction.bid_count}`);
+      }
+
+      // Check if auction just ended
+      if (auctionSummary.status === "complete" && auctionStatuses[productId] !== "complete") {
+        auctionStatuses[productId] = "complete";
+
+        const sortedBids = bids.sort((a, b) => new Date(a.bid_date) - new Date(b.bid_date));
+        const winner = sortedBids[sortedBids.length - 1];
+
+        const endMessage = [
+          "🏁 AUCTION ENDED!",
+          "",
+          `📦 Item: ${productTitle}`,
+          `🏆 Winner: ${winner ? `${winner.customer_first_name[0]}${'*'.repeat(winner.customer_first_name.length - 1)} ${winner.customer_last_name[0]}${'*'.repeat(winner.customer_last_name.length - 1)}` : 'No bids'}`,
+          `💰 Winning Bid: ${winner ? `${winner.currency} ${auction.highest_bid}` : '-'}`,
+          `🏁 Total Bids: ${auction.bid_count}`,
+        ].join("\n");
+
+        await axios.post(
+          `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+          { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: endMessage }
+        );
+
+        console.log(`✅ Auction ended notification sent for "${productTitle}"!`);
       }
     }
 
