@@ -72,8 +72,13 @@ async function checkForNewBids() {
             ].join("\n");
 
             await axios.post(
-              `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-              { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: endMessage }
+              `https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`,
+              {
+                chat_id: CHAT_ID,
+                message_thread_id: THREAD_ID,
+                photo: "https://github.com/cyel1987/auction-telegram/blob/main/PayNow.PNG?raw=true",
+                caption: endMessage
+              }
             );
 
             console.log(`✅ Auction ended: "${productTitle}"`);
