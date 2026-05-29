@@ -16,12 +16,12 @@ async function checkForNewBids() {
   try {
     const [activeRes, completeRes] = await Promise.all([
       axios.get(`https://auction-api.tunnelpacket.com/api/auctions?status=active`, { headers: { Authorization: `Bearer ${API_KEY}` } }),
-      axios.get(`https://auction-api.tunnelpacket.com/api/auctions?status=unfulfilled`, { headers: { Authorization: `Bearer ${API_KEY}` } })
+      axios.get(`https://auction-api.tunnelpacket.com/api/auctions?status=archived`, { headers: { Authorization: `Bearer ${API_KEY}` } })
     ]);
 
     const auctions = [
       ...(Array.isArray(activeRes.data) ? activeRes.data.map(a => ({ ...a, status: "active" })) : []),
-      ...(Array.isArray(completeRes.data) ? completeRes.data.map(a => ({ ...a, status: "unfulfilled" })) : [])
+      ...(Array.isArray(completeRes.data) ? completeRes.data.map(a => ({ ...a, status: "archived" })) : [])
     ];
 
     if (auctions.length === 0) {
@@ -87,8 +87,8 @@ async function checkForNewBids() {
       }
 
       // Check if auction just ended
-      if (currentStatus === "unfulfilled" && auctionStatuses[productId] !== "unfulfilled") {
-        auctionStatuses[productId] = "unfulfilled";
+      if (currentStatus === "archived" && auctionStatuses[productId] !== "archived") {
+        auctionStatuses[productId] = "archived";
 
         const sortedBids = bids.sort((a, b) => new Date(a.bid_date) - new Date(b.bid_date));
         const winner = sortedBids[sortedBids.length - 1];
