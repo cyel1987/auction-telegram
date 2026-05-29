@@ -25,7 +25,6 @@ async function checkForNewBids() {
     if (!initialized) {
       for (const auction of activeAuctions) {
         bidCounts[auction.shopify_product_id] = auction.bid_count;
-        // Mark already-ended auctions on startup to avoid duplicate notifications
         if (new Date(auction.end_date) < now) {
           endedAuctions.add(auction.shopify_product_id);
         }
@@ -35,11 +34,12 @@ async function checkForNewBids() {
       return;
     }
 
+    let hasWinner = false;
+
     for (const auctionSummary of activeAuctions) {
       const productId = auctionSummary.shopify_product_id;
       const productTitle = auctionSummary.shopify_product_title;
       const hasEnded = new Date(auctionSummary.end_date) < now;
-      console.log(`${productTitle} | ends: ${new Date(auctionSummary.end_date).toISOString()} | now: ${now.toISOString()} | hasEnded: ${hasEnded} | alreadyEnded: ${endedAuctions.has(productId)}`);
 
       if (bidCounts[productId] === undefined) {
         bidCounts[productId] = auctionSummary.bid_count;
@@ -63,6 +63,8 @@ async function checkForNewBids() {
             const sortedBids = bids.sort((a, b) => new Date(a.bid_date) - new Date(b.bid_date));
             const winner = sortedBids[sortedBids.length - 1];
 
+            if (winner) hasWinner = true;
+
             const endMessage = [
               "🏁 AUCTION ENDED!",
               "",
@@ -76,18 +78,6 @@ async function checkForNewBids() {
               `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
               { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: endMessage }
             );
-
-            if (winner) {
-              await axios.post(
-                `https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`,
-                {
-                  chat_id: CHAT_ID,
-                  message_thread_id: THREAD_ID,
-                  photo: "https://github.com/cyel1987/auction-telegram/blob/main/PayNow.PNG?raw=true",
-                  caption: "💳 Please make payment via PayNow QR Code."
-                }
-              );
-            }
 
             console.log(`✅ Auction ended: "${productTitle}"`);
           }
@@ -138,6 +128,19 @@ async function checkForNewBids() {
       } else if (!hasEnded) {
         console.log(`No new bids on "${productTitle}". Total: ${auctionSummary.bid_count}`);
       }
+    }
+
+    // Send ONE PayNow QR code if any auction ended with a winner
+    if (hasWinner) {
+      await axios.post(
+        `https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`,
+        {
+          chat_id: CHAT_ID,
+          message_thread_id: THREAD_ID,
+          photo: "https://github.com/cyel1987/auction-telegram/blob/main/PayNow.PNG?raw=true",
+          caption: "💳 Please make payment via PayNow QR Code."
+        }
+      );
     }
 
     console.log("🔁 Check complete.");
