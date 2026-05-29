@@ -44,10 +44,15 @@ async function checkForNewBids() {
             `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
             { headers: { Authorization: `Bearer ${API_KEY}` } }
           );
-          const auction = detailRes.data.auction;
+         const auction = detailRes.data.auction;
           const bids = detailRes.data.auction_bids || [];
           const sortedBids = bids.sort((a, b) => new Date(a.bid_date) - new Date(b.bid_date));
           const winner = sortedBids[sortedBids.length - 1];
+
+          if (!auction) {
+            console.log(`⚠️ No auction data for ${productId}, skipping...`);
+            continue;
+          }
 
           // Get product title from archived list
           const archivedRes = await axios.get(
