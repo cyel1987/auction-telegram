@@ -51,7 +51,7 @@ async function checkForNewBids() {
 
           if (!auction) {
             console.log(`⚠️ No auction data for ${productId}, skipping...`);
-            continue;
+            return;
           }
 
           // Get product title from archived list
