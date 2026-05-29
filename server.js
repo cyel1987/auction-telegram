@@ -35,6 +35,7 @@ async function checkForNewBids() {
 
     // Check for auctions that just ended (disappeared from active list)
     for (const productId of activeProductIds) {
+      console.log(`Checking if ${productId} is still active: ${currentActiveIds.has(productId)}`);
       if (!currentActiveIds.has(productId)) {
         activeProductIds.delete(productId);
 
