@@ -41,6 +41,7 @@ async function checkForNewBids() {
       );
 
       const auction = detailResponse.data.auction;
+      console.log("Statuses found:", auctions.map(a => `${a.shopify_product_title}: ${a.status}`).join(", "));
       const bids = detailResponse.data.auction_bids || [];
 
       if (!initialized) {
