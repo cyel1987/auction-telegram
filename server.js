@@ -39,6 +39,7 @@ async function checkForNewBids() {
       const productId = auctionSummary.shopify_product_id;
       const productTitle = auctionSummary.shopify_product_title;
       const hasEnded = new Date(auctionSummary.end_date) < now;
+      console.log(`${productTitle} | ends: ${new Date(auctionSummary.end_date).toISOString()} | now: ${now.toISOString()} | hasEnded: ${hasEnded} | alreadyEnded: ${endedAuctions.has(productId)}`);
 
       if (bidCounts[productId] === undefined) {
         bidCounts[productId] = auctionSummary.bid_count;
