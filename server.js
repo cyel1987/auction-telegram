@@ -113,8 +113,9 @@ async function checkForNewBids() {
       }
     }
 
-  } catch (err) {
+} catch (err) {
     console.log("❌ Error:", err.message);
+    console.log("❌ Stack:", err.stack);
   }
 }
 
