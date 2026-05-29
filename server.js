@@ -22,14 +22,10 @@ async function checkForNewBids() {
     const activeAuctions = Array.isArray(activeRes.data) ? activeRes.data : [];
     const now = new Date();
 
-    if (!initialized) {
+   if (!initialized) {
       for (const auction of activeAuctions) {
         bidCounts[auction.shopify_product_id] = auction.bid_count;
-       // Mark already-ended auctions so we don't notify on startup
-        if (new Date(auction.end_date) < now) {
-          endedAuctions.add(auction.shopify_product_id);
-          console.log(`⏭️ Skipping already ended auction: ${auction.shopify_product_id}`);
-        }
+        // Never mark as ended on startup — always notify when end time passes
       }
       initialized = true;
       console.log(`✅ Initialized. Watching ${activeAuctions.length} active auction(s)...`);
