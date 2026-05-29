@@ -72,7 +72,6 @@ async function checkForNewBids() {
         );
 
         console.log(`✅ Auction ended: "${productTitle}"`);
-        continue;
       }
 
       // New bid placed
