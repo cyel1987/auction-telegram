@@ -77,7 +77,7 @@ async function checkForNewBids() {
             { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: endMessage }
           );
 
-          console.log(`✅ Auction ended notification sent for "${productTitle}"!`);
+          console.log(`✅ Auction  ended notification sent for "${productTitle}"!`);
         } catch (e) {
           console.log(`❌ Error fetching ended auction ${productId}:`, e.message);
         }
