@@ -25,6 +25,10 @@ async function checkForNewBids() {
     if (!initialized) {
       for (const auction of activeAuctions) {
         bidCounts[auction.shopify_product_id] = auction.bid_count;
+        // Mark already-ended auctions on startup to avoid duplicate notifications
+        if (new Date(auction.end_date) < now) {
+          endedAuctions.add(auction.shopify_product_id);
+        }
       }
       initialized = true;
       console.log(`✅ Initialized. Watching ${activeAuctions.length} active auction(s)...`);
@@ -38,6 +42,7 @@ async function checkForNewBids() {
 
       if (bidCounts[productId] === undefined) {
         bidCounts[productId] = auctionSummary.bid_count;
+        if (hasEnded) endedAuctions.add(productId);
         continue;
       }
 
@@ -45,74 +50,86 @@ async function checkForNewBids() {
       if (hasEnded && !endedAuctions.has(productId)) {
         endedAuctions.add(productId);
 
-        const detailRes = await axios.get(
-          `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
-          { headers: { Authorization: `Bearer ${API_KEY}` } }
-        );
-        const auction = detailRes.data.auction;
-        const bids = detailRes.data.auction_bids || [];
+        try {
+          const detailRes = await axios.get(
+            `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
+            { headers: { Authorization: `Bearer ${API_KEY}` } }
+          );
+          const auction = detailRes.data.auction;
+          const bids = detailRes.data.auction_bids || [];
 
-        if (!auction) continue;
+          if (auction) {
+            const sortedBids = bids.sort((a, b) => new Date(a.bid_date) - new Date(b.bid_date));
+            const winner = sortedBids[sortedBids.length - 1];
 
-        const sortedBids = bids.sort((a, b) => new Date(a.bid_date) - new Date(b.bid_date));
-        const winner = sortedBids[sortedBids.length - 1];
+            const endMessage = [
+              "🏁 AUCTION ENDED!",
+              "",
+              `📦 Item: ${productTitle}`,
+              `🏆 Winner: ${winner ? `${winner.customer_first_name[0]}${'*'.repeat(winner.customer_first_name.length - 1)} ${winner.customer_last_name[0]}${'*'.repeat(winner.customer_last_name.length - 1)}` : 'No bids'}`,
+              `💰 Winning Bid: ${winner ? `${winner.currency} ${auction.highest_bid}` : '-'}`,
+              `🏁 Total Bids: ${auction.bid_count}`,
+            ].join("\n");
 
-        const endMessage = [
-          "🏁 AUCTION ENDED!",
-          "",
-          `📦 Item: ${productTitle}`,
-          `🏆 Winner: ${winner ? `${winner.customer_first_name[0]}${'*'.repeat(winner.customer_first_name.length - 1)} ${winner.customer_last_name[0]}${'*'.repeat(winner.customer_last_name.length - 1)}` : 'No bids'}`,
-          `💰 Winning Bid: ${winner ? `${winner.currency} ${auction.highest_bid}` : '-'}`,
-          `🏁 Total Bids: ${auction.bid_count}`,
-        ].join("\n");
+            await axios.post(
+              `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+              { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: endMessage }
+            );
 
-        await axios.post(
-          `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-          { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: endMessage }
-        );
+            console.log(`✅ Auction ended: "${productTitle}"`);
+          }
+        } catch (e) {
+          console.log(`❌ Error sending ended notification: ${e.message}`);
+        }
 
-        console.log(`✅ Auction ended: "${productTitle}"`);
+        continue;
       }
 
       // New bid placed
       if (!hasEnded && auctionSummary.bid_count > bidCounts[productId]) {
-        const detailRes = await axios.get(
-          `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
-          { headers: { Authorization: `Bearer ${API_KEY}` } }
-        );
-        const auction = detailRes.data.auction;
-        const bids = detailRes.data.auction_bids || [];
-        const sortedBids = bids.sort((a, b) => new Date(a.bid_date) - new Date(b.bid_date));
-        const latestBid = sortedBids[sortedBids.length - 1];
-        const secondLatestBid = sortedBids[sortedBids.length - 2];
+        try {
+          const detailRes = await axios.get(
+            `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
+            { headers: { Authorization: `Bearer ${API_KEY}` } }
+          );
+          const auction = detailRes.data.auction;
+          const bids = detailRes.data.auction_bids || [];
+          const sortedBids = bids.sort((a, b) => new Date(a.bid_date) - new Date(b.bid_date));
+          const latestBid = sortedBids[sortedBids.length - 1];
+          const secondLatestBid = sortedBids[sortedBids.length - 2];
 
-        bidCounts[productId] = auction.bid_count;
+          bidCounts[productId] = auction.bid_count;
 
-        if (!latestBid) continue;
+          if (latestBid) {
+            const message = [
+              "🔨 NEW BID PLACED!",
+              "",
+              `📦 Item: ${productTitle}`,
+              `👤 Bidder: ${latestBid.customer_first_name[0]}${'*'.repeat(latestBid.customer_first_name.length - 1)} ${latestBid.customer_last_name[0]}${'*'.repeat(latestBid.customer_last_name.length - 1)}`,
+              `💰 Previous Bid: ${latestBid.currency} ${secondLatestBid ? secondLatestBid.bid : '-'}`,
+              `📈 Current Bid: ${latestBid.currency} ${auction.highest_bid}`,
+              `🏁 Total Bids: ${auction.bid_count}`,
+              `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
+            ].join("\n");
 
-        const message = [
-          "🔨 NEW BID PLACED!",
-          "",
-          `📦 Item: ${productTitle}`,
-          `👤 Bidder: ${latestBid.customer_first_name[0]}${'*'.repeat(latestBid.customer_first_name.length - 1)} ${latestBid.customer_last_name[0]}${'*'.repeat(latestBid.customer_last_name.length - 1)}`,
-          `💰 Previous Bid: ${latestBid.currency} ${secondLatestBid ? secondLatestBid.bid : '-'}`,
-          `📈 Current Bid: ${latestBid.currency} ${auction.highest_bid}`,
-          `🏁 Total Bids: ${auction.bid_count}`,
-          `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
-        ].join("\n");
+            await axios.post(
+              `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+              { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: message }
+            );
 
-        await axios.post(
-          `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-          { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: message }
-        );
-
-        console.log(`✅ New bid on "${productTitle}"`);
+            console.log(`✅ New bid on "${productTitle}"`);
+          }
+        } catch (e) {
+          console.log(`❌ Error sending bid notification: ${e.message}`);
+        }
       } else if (!hasEnded) {
         console.log(`No new bids on "${productTitle}". Total: ${auctionSummary.bid_count}`);
       }
     }
 
-} catch (err) {
+    console.log("🔁 Check complete.");
+
+  } catch (err) {
     console.log("❌ Error:", err.message);
     console.log("❌ Stack:", err.stack);
   }
