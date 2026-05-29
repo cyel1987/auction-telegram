@@ -22,10 +22,9 @@ async function checkForNewBids() {
     const activeAuctions = Array.isArray(activeRes.data) ? activeRes.data : [];
     const now = new Date();
 
-   if (!initialized) {
+    if (!initialized) {
       for (const auction of activeAuctions) {
         bidCounts[auction.shopify_product_id] = auction.bid_count;
-        // Never mark as ended on startup — always notify when end time passes
       }
       initialized = true;
       console.log(`✅ Initialized. Watching ${activeAuctions.length} active auction(s)...`);
@@ -35,17 +34,14 @@ async function checkForNewBids() {
     for (const auctionSummary of activeAuctions) {
       const productId = auctionSummary.shopify_product_id;
       const productTitle = auctionSummary.shopify_product_title;
-      const endDate = new Date(auctionSummary.end_date);
-      const hasEnded = endDate < now;
-      console.log(`${productTitle} ends: ${endDate.toISOString()} | Now: ${now.toISOString()} | Ended: ${hasEnded}`);
+      const hasEnded = new Date(auctionSummary.end_date) < now;
 
       if (bidCounts[productId] === undefined) {
         bidCounts[productId] = auctionSummary.bid_count;
-        if (hasEnded) endedAuctions.add(productId);
         continue;
       }
 
-      // Check if auction just ended
+      // Auction just ended
       if (hasEnded && !endedAuctions.has(productId)) {
         endedAuctions.add(productId);
 
@@ -75,11 +71,11 @@ async function checkForNewBids() {
           { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: endMessage }
         );
 
-        console.log(`✅ Auction ended notification sent for "${productTitle}"!`);
+        console.log(`✅ Auction ended: "${productTitle}"`);
         continue;
       }
 
-      // Check for new bids (only if auction still active)
+      // New bid placed
       if (!hasEnded && auctionSummary.bid_count > bidCounts[productId]) {
         const detailRes = await axios.get(
           `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
@@ -111,7 +107,7 @@ async function checkForNewBids() {
           { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: message }
         );
 
-        console.log(`✅ New bid on "${productTitle}" sent to Telegram!`);
+        console.log(`✅ New bid on "${productTitle}"`);
       } else if (!hasEnded) {
         console.log(`No new bids on "${productTitle}". Total: ${auctionSummary.bid_count}`);
       }
