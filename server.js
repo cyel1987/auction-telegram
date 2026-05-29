@@ -9,7 +9,7 @@ const THREAD_ID = process.env.THREAD_ID;
 const API_KEY = process.env.API_KEY;
 
 const bidCounts = {};
-const activeProductIds = new Set();
+const endedAuctions = new Set();
 let initialized = false;
 
 async function checkForNewBids() {
@@ -20,84 +20,69 @@ async function checkForNewBids() {
     );
 
     const activeAuctions = Array.isArray(activeRes.data) ? activeRes.data : [];
-    const currentActiveIds = new Set(activeAuctions.map(a => a.shopify_product_id));
+    const now = new Date();
 
-    // First run — just record current active auctions
     if (!initialized) {
       for (const auction of activeAuctions) {
-        activeProductIds.add(auction.shopify_product_id);
         bidCounts[auction.shopify_product_id] = auction.bid_count;
+        // Mark already-ended auctions so we don't notify on startup
+        if (new Date(auction.end_date) < now) {
+          endedAuctions.add(auction.shopify_product_id);
+        }
       }
       initialized = true;
       console.log(`✅ Initialized. Watching ${activeAuctions.length} active auction(s)...`);
       return;
     }
 
-    // Check for auctions that just ended (disappeared from active list)
-    for (const productId of activeProductIds) {
-      console.log(`Checking if ${productId} is still active: ${currentActiveIds.has(productId)}`);
-      if (!currentActiveIds.has(productId)) {
-        activeProductIds.delete(productId);
-
-        // Fetch final details
-        try {
-          const detailRes = await axios.get(
-            `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
-            { headers: { Authorization: `Bearer ${API_KEY}` } }
-          );
-         const auction = detailRes.data.auction;
-          const bids = detailRes.data.auction_bids || [];
-          const sortedBids = bids.sort((a, b) => new Date(a.bid_date) - new Date(b.bid_date));
-          const winner = sortedBids[sortedBids.length - 1];
-
-          if (!auction) {
-            console.log(`⚠️ No auction data for ${productId}, skipping...`);
-            return;
-          }
-
-          // Get product title from archived list
-          const archivedRes = await axios.get(
-            `https://auction-api.tunnelpacket.com/api/auctions?status=archived`,
-            { headers: { Authorization: `Bearer ${API_KEY}` } }
-          );
-          const archivedAuctions = Array.isArray(archivedRes.data) ? archivedRes.data : [];
-          const archivedItem = archivedAuctions.find(a => a.shopify_product_id === productId);
-          const productTitle = archivedItem ? archivedItem.shopify_product_title : productId;
-
-          const endMessage = [
-            "🏁 AUCTION ENDED!",
-            "",
-            `📦 Item: ${productTitle}`,
-            `🏆 Winner: ${winner ? `${winner.customer_first_name[0]}${'*'.repeat(winner.customer_first_name.length - 1)} ${winner.customer_last_name[0]}${'*'.repeat(winner.customer_last_name.length - 1)}` : 'No bids'}`,
-            `💰 Winning Bid: ${winner ? `${winner.currency} ${auction.highest_bid}` : '-'}`,
-            `🏁 Total Bids: ${auction.bid_count}`,
-          ].join("\n");
-
-          await axios.post(
-            `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-            { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: endMessage }
-          );
-
-          console.log(`✅ Auction  ended notification sent for "${productTitle}"!`);
-        } catch (e) {
-          console.log(`❌ Error fetching ended auction ${productId}:`, e.message);
-        }
-      }
-    }
-
-    // Check for new bids on active auctions
     for (const auctionSummary of activeAuctions) {
       const productId = auctionSummary.shopify_product_id;
       const productTitle = auctionSummary.shopify_product_title;
-
-      activeProductIds.add(productId);
+      const endDate = new Date(auctionSummary.end_date);
+      const hasEnded = endDate < now;
 
       if (bidCounts[productId] === undefined) {
         bidCounts[productId] = auctionSummary.bid_count;
+        if (hasEnded) endedAuctions.add(productId);
         continue;
       }
 
-      if (auctionSummary.bid_count > bidCounts[productId]) {
+      // Check if auction just ended
+      if (hasEnded && !endedAuctions.has(productId)) {
+        endedAuctions.add(productId);
+
+        const detailRes = await axios.get(
+          `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
+          { headers: { Authorization: `Bearer ${API_KEY}` } }
+        );
+        const auction = detailRes.data.auction;
+        const bids = detailRes.data.auction_bids || [];
+
+        if (!auction) continue;
+
+        const sortedBids = bids.sort((a, b) => new Date(a.bid_date) - new Date(b.bid_date));
+        const winner = sortedBids[sortedBids.length - 1];
+
+        const endMessage = [
+          "🏁 AUCTION ENDED!",
+          "",
+          `📦 Item: ${productTitle}`,
+          `🏆 Winner: ${winner ? `${winner.customer_first_name[0]}${'*'.repeat(winner.customer_first_name.length - 1)} ${winner.customer_last_name[0]}${'*'.repeat(winner.customer_last_name.length - 1)}` : 'No bids'}`,
+          `💰 Winning Bid: ${winner ? `${winner.currency} ${auction.highest_bid}` : '-'}`,
+          `🏁 Total Bids: ${auction.bid_count}`,
+        ].join("\n");
+
+        await axios.post(
+          `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+          { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: endMessage }
+        );
+
+        console.log(`✅ Auction ended notification sent for "${productTitle}"!`);
+        continue;
+      }
+
+      // Check for new bids (only if auction still active)
+      if (!hasEnded && auctionSummary.bid_count > bidCounts[productId]) {
         const detailRes = await axios.get(
           `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
           { headers: { Authorization: `Bearer ${API_KEY}` } }
@@ -129,7 +114,7 @@ async function checkForNewBids() {
         );
 
         console.log(`✅ New bid on "${productTitle}" sent to Telegram!`);
-      } else {
+      } else if (!hasEnded) {
         console.log(`No new bids on "${productTitle}". Total: ${auctionSummary.bid_count}`);
       }
     }
