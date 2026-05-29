@@ -16,10 +16,15 @@ let initialized = false;
 async function checkForNewBids() {
   try {
     // Step 1: Get all active auctions
-    const listResponse = await axios.get(
-      `https://auction-api.tunnelpacket.com/api/auctions?status=active`,
-      { headers: { Authorization: `Bearer ${API_KEY}` } }
-    );
+    const [activeRes, completeRes] = await Promise.all([
+      axios.get(`https://auction-api.tunnelpacket.com/api/auctions?status=active`, { headers: { Authorization: `Bearer ${API_KEY}` } }),
+      axios.get(`https://auction-api.tunnelpacket.com/api/auctions?status=complete`, { headers: { Authorization: `Bearer ${API_KEY}` } })
+    ]);
+
+    const auctions = [
+      ...activeRes.data.map(a => ({ ...a, status: "active" })),
+      ...completeRes.data.map(a => ({ ...a, status: "complete" }))
+    ];
 
     const auctions = listResponse.data;
     if (!auctions || auctions.length === 0) {
