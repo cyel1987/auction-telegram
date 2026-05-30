@@ -7,10 +7,26 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
 const THREAD_ID = process.env.THREAD_ID;
 const API_KEY = process.env.API_KEY;
+const SHOPIFY_STORE = "geekster-sg.myshopify.com";
 
 const bidCounts = {};
 const endedAuctions = new Set();
+const notifiedNewAuctions = new Set();
 let initialized = false;
+
+async function getShopifyPublishedAt(productId) {
+  try {
+    const res = await axios.get(
+      `https://${SHOPIFY_STORE}/products.json?product_type=&tag=product_auction&limit=50`
+    );
+    const products = res.data.products || [];
+    const product = products.find(p => p.id.toString() === productId.toString());
+    return product ? new Date(product.published_at) : null;
+  } catch (e) {
+    console.log(`❌ Error fetching Shopify product: ${e.message}`);
+    return null;
+  }
+}
 
 async function checkForNewBids() {
   try {
@@ -25,6 +41,7 @@ async function checkForNewBids() {
     if (!initialized) {
       for (const auction of activeAuctions) {
         bidCounts[auction.shopify_product_id] = auction.bid_count;
+        notifiedNewAuctions.add(auction.shopify_product_id);
         if (new Date(auction.end_date) < now) {
           endedAuctions.add(auction.shopify_product_id);
         }
@@ -43,19 +60,17 @@ async function checkForNewBids() {
 
       if (bidCounts[productId] === undefined) {
         bidCounts[productId] = auctionSummary.bid_count;
+
         if (hasEnded) {
           endedAuctions.add(productId);
-        } else {
-          // New auction detected - only notify on Monday/Wednesday at 10:00am SGT
-          const sgtHour = parseInt(new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", hour: "numeric", hour12: false }));
-          const sgtMinute = parseInt(new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", minute: "numeric" }));
-          const sgtDay = new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", weekday: "long" });
-          const isAuctionDay = sgtDay === "Monday" || sgtDay === "Wednesday";
-          const isAuctionTime = isAuctionDay && sgtHour === 10 && sgtMinute === 0;
+          notifiedNewAuctions.add(productId);
+        } else if (!notifiedNewAuctions.has(productId)) {
+          // Check Shopify published_at
+          const publishedAt = await getShopifyPublishedAt(productId);
+          const secondsSincePublished = publishedAt ? (now - publishedAt) / 1000 : 999;
 
-          if (!isAuctionTime) {
-            console.log(`⏳ New auction "${productTitle}" detected but not auction time. Skipping.`);
-          } else {
+          if (publishedAt && secondsSincePublished <= 60) {
+            notifiedNewAuctions.add(productId);
             try {
               const detailRes = await axios.get(
                 `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
@@ -85,6 +100,9 @@ async function checkForNewBids() {
             } catch (e) {
               console.log(`❌ Error sending new auction notification: ${e.message}`);
             }
+          } else {
+            notifiedNewAuctions.add(productId);
+            console.log(`⏳ New auction "${productTitle}" detected but published ${Math.round(secondsSincePublished)}s ago. Skipping.`);
           }
         }
         continue;
