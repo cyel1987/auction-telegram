@@ -34,7 +34,6 @@ async function checkForNewBids() {
       return;
     }
 
-    const knownProductIds = new Set(Object.keys(bidCounts));
     let hasWinner = false;
 
     for (const auctionSummary of activeAuctions) {
@@ -47,35 +46,45 @@ async function checkForNewBids() {
         if (hasEnded) {
           endedAuctions.add(productId);
         } else {
-          // New auction detected
-          try {
-            const detailRes = await axios.get(
-              `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
-              { headers: { Authorization: `Bearer ${API_KEY}` } }
-            );
-            const auction = detailRes.data.auction;
+          // New auction detected - only notify on Monday/Wednesday at 10:00am SGT
+          const sgtHour = parseInt(new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", hour: "numeric", hour12: false }));
+          const sgtMinute = parseInt(new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", minute: "numeric" }));
+          const sgtDay = new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", weekday: "long" });
+          const isAuctionDay = sgtDay === "Monday" || sgtDay === "Wednesday";
+          const isAuctionTime = isAuctionDay && sgtHour === 10 && sgtMinute === 0;
 
-            if (auction) {
-              const newAuctionMessage = [
-                "🆕 NEW AUCTION LISTED!",
-                "",
-                `📦 Item: ${productTitle}`,
-                `💰 Starting Price: ${auctionSummary.starting_price ? `SGD ${auctionSummary.starting_price}` : 'N.A.'}`,
-                `🔓 Release Price: ${auction.reserve_price ? `SGD ${auction.reserve_price}` : 'N.A.'}`,
-                `🛒 Buyout Price: ${auction.buy_it_now_price ? `SGD ${auction.buy_it_now_price}` : 'N.A.'}`,
-                `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
-                `🔗 Bid Here: https://www.geekster.sg/collections/auctions`,
-              ].join("\n");
-
-              await axios.post(
-                `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-                { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: newAuctionMessage }
+          if (!isAuctionTime) {
+            console.log(`⏳ New auction "${productTitle}" detected but not auction time. Skipping.`);
+          } else {
+            try {
+              const detailRes = await axios.get(
+                `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
+                { headers: { Authorization: `Bearer ${API_KEY}` } }
               );
+              const auction = detailRes.data.auction;
 
-              console.log(`✅ New auction listed: "${productTitle}"`);
+              if (auction) {
+                const newAuctionMessage = [
+                  "🆕 NEW AUCTION LISTED!",
+                  "",
+                  `📦 Item: ${productTitle}`,
+                  `💰 Starting Price: ${auctionSummary.starting_price ? `SGD ${auctionSummary.starting_price}` : 'N.A.'}`,
+                  `🔓 Release Price: ${auction.reserve_price ? `SGD ${auction.reserve_price}` : 'N.A.'}`,
+                  `🛒 Buyout Price: ${auction.buy_it_now_price ? `SGD ${auction.buy_it_now_price}` : 'N.A.'}`,
+                  `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
+                  `🔗 Bid Here: https://www.geekster.sg/collections/auctions`,
+                ].join("\n");
+
+                await axios.post(
+                  `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+                  { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: newAuctionMessage }
+                );
+
+                console.log(`✅ New auction listed: "${productTitle}"`);
+              }
+            } catch (e) {
+              console.log(`❌ Error sending new auction notification: ${e.message}`);
             }
-          } catch (e) {
-            console.log(`❌ Error sending new auction notification: ${e.message}`);
           }
         }
         continue;
