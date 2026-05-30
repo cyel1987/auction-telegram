@@ -112,6 +112,8 @@ async function checkForNewBids() {
               `💰 Previous Bid: ${latestBid.currency} ${secondLatestBid ? secondLatestBid.bid : '-'}`,
               `📈 Current Bid: ${latestBid.currency} ${auction.highest_bid}`,
               `🏁 Total Bids: ${auction.bid_count}`,
+              `🔓 Reserve Price: ${auction.reserve_price ? `${latestBid.currency} ${auction.reserve_price}` : 'N.A.'}`,
+              `🛒 Buyout Price: ${auction.buy_it_now_price ? `${latestBid.currency} ${auction.buy_it_now_price}` : 'N.A.'}`,
               `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
             ].join("\n");
 
