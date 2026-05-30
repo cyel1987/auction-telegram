@@ -14,18 +14,22 @@ const endedAuctions = new Set();
 const notifiedNewAuctions = new Set();
 let initialized = false;
 
-async function getShopifyPublishedAt(productId) {
+async function getShopifyProductInfo(productId) {
   try {
     const res = await axios.get(
-      `https://${SHOPIFY_STORE}/products.json?product_type=&tag=product_auction&limit=50`
+      `https://${SHOPIFY_STORE}/products.json?tag=product_auction&limit=50`
     );
     const products = res.data.products || [];
     const product = products.find(p => p.id.toString() === productId.toString());
-    return product ? new Date(product.published_at) : null;
+    return product ? {
+      publishedAt: new Date(product.published_at),
+      handle: product.handle
+    } : null;
   } catch (e) {
     console.log(`❌ Error fetching Shopify product: ${e.message}`);
     return null;
   }
+}
 }
 
 async function checkForNewBids() {
@@ -66,7 +70,10 @@ async function checkForNewBids() {
           notifiedNewAuctions.add(productId);
         } else if (!notifiedNewAuctions.has(productId)) {
           // Check Shopify published_at
-          const publishedAt = await getShopifyPublishedAt(productId);
+          const shopifyInfo = await getShopifyProductInfo(productId);
+          const publishedAt = shopifyInfo ? shopifyInfo.publishedAt : null;
+          const productHandle = shopifyInfo ? shopifyInfo.handle : null;
+          const productUrl = productHandle ? `https://www.geekster.sg/products/${productHandle}` : 'https://www.geekster.sg/collections/auctions';
           const secondsSincePublished = publishedAt ? (now - publishedAt) / 1000 : 999;
 
           const sgtHour = parseInt(new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", hour: "numeric", hour12: false }));
@@ -93,7 +100,7 @@ async function checkForNewBids() {
                   `🔓 Release Price: ${auction.reserve_price ? `SGD ${auction.reserve_price}` : 'N.A.'}`,
                   `🛒 Buyout Price: ${auction.buy_it_now_price ? `SGD ${auction.buy_it_now_price}` : 'N.A.'}`,
                   `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
-                  `🔗 [Submit Your Bid Here](https://www.geekster.sg/collections/auctions)`,
+                  `🔗 [Submit Your Bid Here](${productUrl})`,
                 ].join("\n");
 
                 await axios.post(
@@ -164,6 +171,8 @@ async function checkForNewBids() {
           );
           const auction = detailRes.data.auction;
           const bids = detailRes.data.auction_bids || [];
+          const bidShopifyInfo = await getShopifyProductInfo(productId);
+          const bidProductUrl = bidShopifyInfo ? `https://www.geekster.sg/products/${bidShopifyInfo.handle}` : 'https://www.geekster.sg/collections/auctions';
           const sortedBids = bids.sort((a, b) => new Date(a.bid_date) - new Date(b.bid_date));
           const latestBid = sortedBids[sortedBids.length - 1];
           const secondLatestBid = sortedBids[sortedBids.length - 2];
@@ -182,7 +191,7 @@ async function checkForNewBids() {
               `🔓 Release Price: ${auction.reserve_price ? `${latestBid.currency} ${auction.reserve_price}` : 'N.A.'}`,
               `🛒 Buyout Price: ${auction.buy_it_now_price ? `${latestBid.currency} ${auction.buy_it_now_price}` : 'N.A.'}`,
               `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
-              `🔗 [Submit Your Bid Here](https://www.geekster.sg/collections/auctions)`,
+              `🔗 [Submit Your Bid Here](${bidProductUrl})`,
             ].join("\n");
 
             await axios.post(
