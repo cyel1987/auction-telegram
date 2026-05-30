@@ -30,7 +30,6 @@ async function getShopifyProductInfo(productId) {
     return null;
   }
 }
-}
 
 async function checkForNewBids() {
   try {
@@ -69,13 +68,6 @@ async function checkForNewBids() {
           endedAuctions.add(productId);
           notifiedNewAuctions.add(productId);
         } else if (!notifiedNewAuctions.has(productId)) {
-          // Check Shopify published_at
-          const shopifyInfo = await getShopifyProductInfo(productId);
-          const publishedAt = shopifyInfo ? shopifyInfo.publishedAt : null;
-          const productHandle = shopifyInfo ? shopifyInfo.handle : null;
-          const productUrl = productHandle ? `https://www.geekster.sg/products/${productHandle}` : 'https://www.geekster.sg/collections/auctions';
-          const secondsSincePublished = publishedAt ? (now - publishedAt) / 1000 : 999;
-
           const sgtHour = parseInt(new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", hour: "numeric", hour12: false }));
           const sgtMinute = parseInt(new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", minute: "numeric" }));
           const sgtDay = new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", weekday: "long" });
@@ -85,6 +77,9 @@ async function checkForNewBids() {
           if (isAuctionTime) {
             notifiedNewAuctions.add(productId);
             try {
+              const shopifyInfo = await getShopifyProductInfo(productId);
+              const productUrl = shopifyInfo ? `https://www.geekster.sg/products/${shopifyInfo.handle}` : 'https://www.geekster.sg/collections/auctions';
+
               const detailRes = await axios.get(
                 `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
                 { headers: { Authorization: `Bearer ${API_KEY}` } }
@@ -113,7 +108,7 @@ async function checkForNewBids() {
             } catch (e) {
               console.log(`❌ Error sending new auction notification: ${e.message}`);
             }
-         } else {
+          } else {
             notifiedNewAuctions.add(productId);
             console.log(`⏳ New auction "${productTitle}" detected but not auction time. Skipping.`);
           }
@@ -171,13 +166,14 @@ async function checkForNewBids() {
           );
           const auction = detailRes.data.auction;
           const bids = detailRes.data.auction_bids || [];
-          const bidShopifyInfo = await getShopifyProductInfo(productId);
-          const bidProductUrl = bidShopifyInfo ? `https://www.geekster.sg/products/${bidShopifyInfo.handle}` : 'https://www.geekster.sg/collections/auctions';
           const sortedBids = bids.sort((a, b) => new Date(a.bid_date) - new Date(b.bid_date));
           const latestBid = sortedBids[sortedBids.length - 1];
           const secondLatestBid = sortedBids[sortedBids.length - 2];
 
           bidCounts[productId] = auction.bid_count;
+
+          const bidShopifyInfo = await getShopifyProductInfo(productId);
+          const bidProductUrl = bidShopifyInfo ? `https://www.geekster.sg/products/${bidShopifyInfo.handle}` : 'https://www.geekster.sg/collections/auctions';
 
           if (latestBid) {
             const message = [
