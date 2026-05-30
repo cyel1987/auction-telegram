@@ -69,7 +69,13 @@ async function checkForNewBids() {
           const publishedAt = await getShopifyPublishedAt(productId);
           const secondsSincePublished = publishedAt ? (now - publishedAt) / 1000 : 999;
 
-          if (publishedAt && secondsSincePublished <= 60) {
+          const sgtHour = parseInt(new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", hour: "numeric", hour12: false }));
+          const sgtMinute = parseInt(new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", minute: "numeric" }));
+          const sgtDay = new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", weekday: "long" });
+          const isAuctionDay = sgtDay === "Monday" || sgtDay === "Wednesday";
+          const isAuctionTime = isAuctionDay && sgtHour === 10 && sgtMinute === 0;
+
+          if (isAuctionTime) {
             notifiedNewAuctions.add(productId);
             try {
               const detailRes = await axios.get(
@@ -100,9 +106,9 @@ async function checkForNewBids() {
             } catch (e) {
               console.log(`❌ Error sending new auction notification: ${e.message}`);
             }
-          } else {
+         } else {
             notifiedNewAuctions.add(productId);
-            console.log(`⏳ New auction "${productTitle}" detected but published ${Math.round(secondsSincePublished)}s ago. Skipping.`);
+            console.log(`⏳ New auction "${productTitle}" detected but not auction time. Skipping.`);
           }
         }
         continue;
