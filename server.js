@@ -12,6 +12,7 @@ const SHOPIFY_STORE = "geekster-sg.myshopify.com";
 const bidCounts = {};
 const endedAuctions = new Set();
 const notifiedNewAuctions = new Set();
+const sentReminders = {}; // tracks which reminders sent per auction
 let initialized = false;
 
 async function getShopifyProductInfo(productId) {
@@ -45,6 +46,7 @@ async function checkForNewBids() {
       for (const auction of activeAuctions) {
         bidCounts[auction.shopify_product_id] = auction.bid_count;
         notifiedNewAuctions.add(auction.shopify_product_id);
+        sentReminders[auction.shopify_product_id] = [];
         if (new Date(auction.end_date) < now) {
           endedAuctions.add(auction.shopify_product_id);
         }
@@ -59,10 +61,13 @@ async function checkForNewBids() {
     for (const auctionSummary of activeAuctions) {
       const productId = auctionSummary.shopify_product_id;
       const productTitle = auctionSummary.shopify_product_title;
-      const hasEnded = new Date(auctionSummary.end_date) < now;
+      const endDate = new Date(auctionSummary.end_date);
+      const hasEnded = endDate < now;
+      const minutesLeft = (endDate - now) / 60000;
 
       if (bidCounts[productId] === undefined) {
         bidCounts[productId] = auctionSummary.bid_count;
+        sentReminders[productId] = [];
 
         if (hasEnded) {
           endedAuctions.add(productId);
@@ -114,6 +119,46 @@ async function checkForNewBids() {
           }
         }
         continue;
+      }
+
+      // Send reminders before auction ends
+      if (!hasEnded) {
+     const reminders = [
+          { minutes: 30, label: "30 minutes" },
+          { minutes: 15, label: "15 minutes" },
+          { minutes: 5, label: "5 minutes" },
+        ];
+
+        for (const reminder of reminders) {
+          const alreadySent = (sentReminders[productId] || []).includes(reminder.minutes);
+          if (!alreadySent && minutesLeft <= reminder.minutes && minutesLeft > reminder.minutes - 1) {
+            sentReminders[productId] = [...(sentReminders[productId] || []), reminder.minutes];
+
+            try {
+              const shopifyInfo = await getShopifyProductInfo(productId);
+              const productUrl = shopifyInfo ? `https://www.geekster.sg/products/${shopifyInfo.handle}` : 'https://www.geekster.sg/collections/auctions';
+
+              const reminderMessage = [
+                "⏰ AUCTION ENDING SOON!",
+                "",
+                `📦 Item: ${productTitle}`,
+                `📈 Current Bid: SGD ${auctionSummary.highest_bid}`,
+                `🏁 Total Bids: ${auctionSummary.bid_count}`,
+                `⌛ Ending in ${reminder.label}!`,
+                `🔗 [Submit Your Bid Here](${productUrl})`,
+              ].join("\n");
+
+              await axios.post(
+                `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+                { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: reminderMessage, parse_mode: "Markdown" }
+              );
+
+              console.log(`✅ ${reminder.label} reminder sent for "${productTitle}"`);
+            } catch (e) {
+              console.log(`❌ Error sending reminder: ${e.message}`);
+            }
+          }
+        }
       }
 
       // Auction just ended
