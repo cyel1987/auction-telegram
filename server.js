@@ -93,12 +93,12 @@ async function checkForNewBids() {
                   `🔓 Release Price: ${auction.reserve_price ? `SGD ${auction.reserve_price}` : 'N.A.'}`,
                   `🛒 Buyout Price: ${auction.buy_it_now_price ? `SGD ${auction.buy_it_now_price}` : 'N.A.'}`,
                   `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
-                  `🔗 Bid Here: https://www.geekster.sg/collections/auctions`,
+                  `🔗 [Submit Your Bid Here](https://www.geekster.sg/collections/auctions)`,
                 ].join("\n");
 
                 await axios.post(
                   `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-                  { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: newAuctionMessage }
+                  { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: newAuctionMessage, parse_mode: "Markdown" }
                 );
 
                 console.log(`✅ New auction listed: "${productTitle}"`);
@@ -182,11 +182,12 @@ async function checkForNewBids() {
               `🔓 Release Price: ${auction.reserve_price ? `${latestBid.currency} ${auction.reserve_price}` : 'N.A.'}`,
               `🛒 Buyout Price: ${auction.buy_it_now_price ? `${latestBid.currency} ${auction.buy_it_now_price}` : 'N.A.'}`,
               `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
+              `🔗 [Submit Your Bid Here](https://www.geekster.sg/collections/auctions)`,
             ].join("\n");
 
             await axios.post(
               `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-              { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: message }
+              { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: message, parse_mode: "Markdown" }
             );
 
             console.log(`✅ New bid on "${productTitle}"`);
