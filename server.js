@@ -60,7 +60,7 @@ async function checkForNewBids() {
                 "🆕 NEW AUCTION LISTED!",
                 "",
                 `📦 Item: ${productTitle}`,
-                `💰 Starting Price: ${auctionSummary.starting_price ? `${latestBid?.currency || 'SGD'} ${auctionSummary.starting_price}` : 'N.A.'}`,
+                `💰 Starting Price: ${auctionSummary.starting_price ? `SGD ${auctionSummary.starting_price}` : 'N.A.'}`,
                 `🔓 Release Price: ${auction.reserve_price ? `SGD ${auction.reserve_price}` : 'N.A.'}`,
                 `🛒 Buyout Price: ${auction.buy_it_now_price ? `SGD ${auction.buy_it_now_price}` : 'N.A.'}`,
                 `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
