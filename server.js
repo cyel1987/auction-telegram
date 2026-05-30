@@ -34,6 +34,7 @@ async function checkForNewBids() {
       return;
     }
 
+    const knownProductIds = new Set(Object.keys(bidCounts));
     let hasWinner = false;
 
     for (const auctionSummary of activeAuctions) {
@@ -43,7 +44,40 @@ async function checkForNewBids() {
 
       if (bidCounts[productId] === undefined) {
         bidCounts[productId] = auctionSummary.bid_count;
-        if (hasEnded) endedAuctions.add(productId);
+        if (hasEnded) {
+          endedAuctions.add(productId);
+        } else {
+          // New auction detected
+          try {
+            const detailRes = await axios.get(
+              `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
+              { headers: { Authorization: `Bearer ${API_KEY}` } }
+            );
+            const auction = detailRes.data.auction;
+
+            if (auction) {
+              const newAuctionMessage = [
+                "🆕 NEW AUCTION LISTED!",
+                "",
+                `📦 Item: ${productTitle}`,
+                `💰 Starting Price: ${auctionSummary.starting_price ? `${latestBid?.currency || 'SGD'} ${auctionSummary.starting_price}` : 'N.A.'}`,
+                `🔓 Release Price: ${auction.reserve_price ? `SGD ${auction.reserve_price}` : 'N.A.'}`,
+                `🛒 Buyout Price: ${auction.buy_it_now_price ? `SGD ${auction.buy_it_now_price}` : 'N.A.'}`,
+                `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
+                `🔗 Bid Here: https://www.geekster.sg/collections/auctions`,
+              ].join("\n");
+
+              await axios.post(
+                `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+                { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: newAuctionMessage }
+              );
+
+              console.log(`✅ New auction listed: "${productTitle}"`);
+            }
+          } catch (e) {
+            console.log(`❌ Error sending new auction notification: ${e.message}`);
+          }
+        }
         continue;
       }
 
@@ -112,7 +146,7 @@ async function checkForNewBids() {
               `💰 Previous Bid: ${latestBid.currency} ${secondLatestBid ? secondLatestBid.bid : '-'}`,
               `📈 Current Bid: ${latestBid.currency} ${auction.highest_bid}`,
               `🏁 Total Bids: ${auction.bid_count}`,
-              `🔓 Reserve Price: ${auction.reserve_price ? `${latestBid.currency} ${auction.reserve_price}` : 'N.A.'}`,
+              `🔓 Release Price: ${auction.reserve_price ? `${latestBid.currency} ${auction.reserve_price}` : 'N.A.'}`,
               `🛒 Buyout Price: ${auction.buy_it_now_price ? `${latestBid.currency} ${auction.buy_it_now_price}` : 'N.A.'}`,
               `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
             ].join("\n");
