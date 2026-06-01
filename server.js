@@ -194,6 +194,8 @@ async function checkForNewBids() {
 
             if (winner) hasWinner = true;
 
+            const reserveNotMet = auction.reserve_price && parseFloat(auction.highest_bid) < parseFloat(auction.reserve_price);
+
             const endMessage = [
               "🏁 AUCTION ENDED!",
               "",
@@ -201,6 +203,12 @@ async function checkForNewBids() {
               `🏆 Winner: ${winner ? `${winner.customer_first_name[0]}${'*'.repeat(winner.customer_first_name.length - 1)} ${winner.customer_last_name[0]}${'*'.repeat(winner.customer_last_name.length - 1)}` : 'No bids'}`,
               `💰 Winning Bid: ${winner ? `${winner.currency} ${auction.highest_bid}` : '-'}`,
               `🏁 Total Bids: ${auction.bid_count}`,
+              `🔓 Release Price: ${auction.reserve_price ? `${winner ? winner.currency : 'SGD'} ${auction.reserve_price}` : 'N.A.'}`,
+              ...(reserveNotMet ? [
+                "",
+                `⚠️ The current bid has not met the Release Price of ${winner.currency} ${auction.reserve_price}.`,
+                `We will get back to the current winner if the seller is fine to let go at the current bid price.`,
+              ] : []),
             ].join("\n");
 
             await axios.post(
