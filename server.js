@@ -224,7 +224,7 @@ async function checkForNewBids() {
               "🔨 NEW BID PLACED!",
               "",
               `📦 Item: ${productTitle}`,
-              `👤 Bidder: ${latestBid.customer_first_name[0]}${'*'.repeat(latestBid.customer_first_name.length - 1)} ${latestBid.customer_last_name[0]}${'*'.repeat(latestBid.customer_last_name.length - 1)}`,
+              `👤 Bidder: ${latestBid.customer_first_name} ${latestBid.customer_last_name}`,
               `💰 Previous Bid: ${latestBid.currency} ${secondLatestBid ? secondLatestBid.bid : '-'}`,
               `📈 Current Bid: ${latestBid.currency} ${auction.highest_bid}`,
               `🏁 Total Bids: ${auction.bid_count}`,
