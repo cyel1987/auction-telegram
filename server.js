@@ -141,15 +141,23 @@ async function checkForNewBids() {
               const shopifyInfo = await getShopifyProductInfo(productId);
               const productUrl = shopifyInfo ? `https://www.geekster.sg/products/${shopifyInfo.handle}` : 'https://www.geekster.sg/collections/auctions';
 
+              const detailReminderRes = await axios.get(
+                `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
+                { headers: { Authorization: `Bearer ${API_KEY}` } }
+              );
+              const reminderAuction = detailReminderRes.data.auction;
+
               const reminderMessage = [
-                "⏰ AUCTION ENDING SOON!",
-                "",
-                `📦 Item: ${productTitle}`,
-                `📈 Current Bid: SGD ${auctionSummary.highest_bid}`,
-                `🏁 Total Bids: ${auctionSummary.bid_count}`,
-                `⌛ Ending in ${reminder.label}!`,
-                `🔗 <a href="${productUrl}">Submit Your Bid Here</a>`,
-              ].join("\n");
+                  "⏰ AUCTION ENDING SOON!",
+                  "",
+                  `📦 Item: ${productTitle}`,
+                  `📈 Current Bid: SGD ${auctionSummary.highest_bid}`,
+                  `🏁 Total Bids: ${auctionSummary.bid_count}`,
+                  `🔓 Release Price: ${reminderAuction?.reserve_price ? `SGD ${reminderAuction.reserve_price}` : 'N.A.'}`,
+                  `🛒 Buyout Price: ${reminderAuction?.buy_it_now_price ? `SGD ${reminderAuction.buy_it_now_price}` : 'N.A.'}`,
+                  `⌛ Ending in ${reminder.label}!`,
+                  `🔗 <a href="${productUrl}">Submit Your Bid Here</a>`,
+                ].join("\n");
 
               await axios.post(
                 `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
