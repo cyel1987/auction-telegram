@@ -45,17 +45,16 @@ async function checkForNewBids() {
     if (!initialized) {
       for (const auction of activeAuctions) {
         bidCounts[auction.shopify_product_id] = auction.bid_count;
-        notifiedNewAuctions.add(auction.shopify_product_id);
         sentReminders[auction.shopify_product_id] = [];
         if (new Date(auction.end_date) < now) {
           endedAuctions.add(auction.shopify_product_id);
+          notifiedNewAuctions.add(auction.shopify_product_id);
         }
       }
       initialized = true;
       console.log(`✅ Initialized. Watching ${activeAuctions.length} active auction(s)...`);
       return;
     }
-
     let hasWinner = false;
 
     for (const auctionSummary of activeAuctions) {
