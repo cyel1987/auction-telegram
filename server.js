@@ -146,12 +146,16 @@ async function checkForNewBids() {
                 { headers: { Authorization: `Bearer ${API_KEY}` } }
               );
               const reminderAuction = detailReminderRes.data.auction;
+              const reminderBids = detailReminderRes.data.auction_bids || [];
+              const sortedReminderBids = reminderBids.sort((a, b) => new Date(a.bid_date) - new Date(b.bid_date));
+              const currentLeader = sortedReminderBids[sortedReminderBids.length - 1];
 
               const reminderMessage = [
                   "⏰ AUCTION ENDING SOON!",
                   "",
                   `📦 Item: ${productTitle}`,
                   `📈 Current Bid: SGD ${auctionSummary.highest_bid}`,
+                  `👤 Current Bidder: ${currentLeader ? `${currentLeader.customer_first_name[0]}${'*'.repeat(Math.max(currentLeader.customer_first_name.length - 1, 1))} ${currentLeader.customer_last_name[0]}${'*'.repeat(Math.max(currentLeader.customer_last_name.length - 1, 1))}` : 'No bids yet'}`,
                   `🏁 Total Bids: ${auctionSummary.bid_count}`,
                   `🔓 Release Price: ${reminderAuction?.reserve_price ? `SGD ${reminderAuction.reserve_price}` : 'N.A.'}`,
                   `🛒 Buyout Price: ${reminderAuction?.buy_it_now_price ? `SGD ${reminderAuction.buy_it_now_price}` : 'N.A.'}`,
