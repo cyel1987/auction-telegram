@@ -123,6 +123,10 @@ async function checkForNewBids() {
       // Send reminders before auction ends
       if (!hasEnded) {
      const reminders = [
+          { minutes: 240, label: "4 hours" },
+          { minutes: 180, label: "3 hours" },
+          { minutes: 120, label: "2 hours" },
+          { minutes: 60, label: "1 hour" },
           { minutes: 30, label: "30 minutes" },
           { minutes: 15, label: "15 minutes" },
           { minutes: 5, label: "5 minutes" },
