@@ -14,6 +14,7 @@ const endedAuctions = new Set();
 const notifiedNewAuctions = new Set();
 const sentReminders = {}; // tracks which reminders sent per auction
 let initialized = false;
+const auctionEndDates = {};
 
 async function getShopifyProductInfo(productId) {
   try {
@@ -63,6 +64,12 @@ async function checkForNewBids() {
       const endDate = new Date(auctionSummary.end_date);
       const hasEnded = endDate < now;
       const minutesLeft = (endDate - now) / 60000;
+      // Reset reminders if end date has changed
+      if (auctionEndDates[productId] && auctionEndDates[productId] !== auctionSummary.end_date) {
+        console.log(`🔄 End date changed for "${productTitle}", resetting reminders...`);
+        sentReminders[productId] = [];
+      }
+      auctionEndDates[productId] = auctionSummary.end_date;
 
       if (bidCounts[productId] === undefined) {
         bidCounts[productId] = auctionSummary.bid_count;
