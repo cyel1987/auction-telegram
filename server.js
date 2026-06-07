@@ -6,15 +6,16 @@ app.use(express.json());
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
 const THREAD_ID = process.env.THREAD_ID;
+const THREAD_ID_SHORT = process.env.THREAD_ID_SHORT;
 const API_KEY = process.env.API_KEY;
 const SHOPIFY_STORE = "geekster-sg.myshopify.com";
 
 const bidCounts = {};
 const endedAuctions = new Set();
 const notifiedNewAuctions = new Set();
-const sentReminders = {}; // tracks which reminders sent per auction
-let initialized = false;
+const sentReminders = {};
 const auctionEndDates = {};
+let initialized = false;
 
 async function getShopifyProductInfo(productId) {
   try {
@@ -33,6 +34,10 @@ async function getShopifyProductInfo(productId) {
   }
 }
 
+function formatAmount(amount) {
+  return parseFloat(amount).toFixed(0);
+}
+
 async function checkForNewBids() {
   try {
     const activeRes = await axios.get(
@@ -47,6 +52,7 @@ async function checkForNewBids() {
       for (const auction of activeAuctions) {
         bidCounts[auction.shopify_product_id] = auction.bid_count;
         sentReminders[auction.shopify_product_id] = [];
+        auctionEndDates[auction.shopify_product_id] = auction.end_date;
         if (new Date(auction.end_date) < now) {
           endedAuctions.add(auction.shopify_product_id);
           notifiedNewAuctions.add(auction.shopify_product_id);
@@ -56,6 +62,7 @@ async function checkForNewBids() {
       console.log(`✅ Initialized. Watching ${activeAuctions.length} active auction(s)...`);
       return;
     }
+
     let hasWinner = false;
 
     for (const auctionSummary of activeAuctions) {
@@ -64,6 +71,7 @@ async function checkForNewBids() {
       const endDate = new Date(auctionSummary.end_date);
       const hasEnded = endDate < now;
       const minutesLeft = (endDate - now) / 60000;
+
       // Reset reminders if end date has changed
       if (auctionEndDates[productId] && auctionEndDates[productId] !== auctionSummary.end_date) {
         console.log(`🔄 End date changed for "${productTitle}", resetting reminders...`);
@@ -102,9 +110,9 @@ async function checkForNewBids() {
                   "🆕 NEW AUCTION LISTED!",
                   "",
                   `📦 Item: ${productTitle}`,
-                  `💰 Starting Price: ${auctionSummary.starting_price ? `SGD ${auctionSummary.starting_price}` : 'N.A.'}`,
-                  `🔓 Release Price: ${auction.reserve_price ? `SGD ${auction.reserve_price}` : 'N.A.'}`,
-                  `🛒 Buyout Price: ${auction.buy_it_now_price ? `SGD ${auction.buy_it_now_price}` : 'N.A.'}`,
+                  `💰 Starting Price: ${auctionSummary.starting_price ? `SGD ${formatAmount(auctionSummary.starting_price)}` : 'N.A.'}`,
+                  `🔓 Release Price: ${auction.reserve_price ? `SGD ${formatAmount(auction.reserve_price)}` : 'N.A.'}`,
+                  `🛒 Buyout Price: ${auction.buy_it_now_price ? `SGD ${formatAmount(auction.buy_it_now_price)}` : 'N.A.'}`,
                   `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
                   `🔗 <a href="${productUrl}">Submit Your Bid Here</a>`,
                 ].join("\n");
@@ -129,7 +137,7 @@ async function checkForNewBids() {
 
       // Send reminders before auction ends
       if (!hasEnded) {
-     const reminders = [
+        const reminders = [
           { minutes: 240, label: "4 hours" },
           { minutes: 180, label: "3 hours" },
           { minutes: 120, label: "2 hours" },
@@ -158,21 +166,34 @@ async function checkForNewBids() {
               const currentLeader = sortedReminderBids[sortedReminderBids.length - 1];
 
               const reminderMessage = [
-                  "⏰ AUCTION ENDING SOON!",
-                  "",
-                  `📦 Item: ${productTitle}`,
-                  `📈 Current Bid: SGD ${auctionSummary.highest_bid}`,
-                  `👤 Current Bidder: ${currentLeader ? `${currentLeader.customer_first_name[0]}${'*'.repeat(Math.max(currentLeader.customer_first_name.length - 1, 1))} ${currentLeader.customer_last_name[0]}${'*'.repeat(Math.max(currentLeader.customer_last_name.length - 1, 1))}` : 'No bids yet'}`,
-                  `🏁 Total Bids: ${auctionSummary.bid_count}`,
-                  `🔓 Release Price: ${reminderAuction?.reserve_price ? `SGD ${reminderAuction.reserve_price}` : 'N.A.'}`,
-                  `🛒 Buyout Price: ${reminderAuction?.buy_it_now_price ? `SGD ${reminderAuction.buy_it_now_price}` : 'N.A.'}`,
-                  `⌛ Ending in ${reminder.label}!`,
-                  `🔗 <a href="${productUrl}">Submit Your Bid Here</a>`,
-                ].join("\n");
+                "⏰ AUCTION ENDING SOON!",
+                "",
+                `📦 Item: ${productTitle}`,
+                `📈 Current Bid: SGD ${formatAmount(auctionSummary.highest_bid)}`,
+                `👤 Current Bidder: ${currentLeader ? `${currentLeader.customer_first_name[0]}${'*'.repeat(Math.max(currentLeader.customer_first_name.length - 1, 1))} ${currentLeader.customer_last_name[0]}${'*'.repeat(Math.max(currentLeader.customer_last_name.length - 1, 1))}` : 'No bids yet'}`,
+                `🏁 Total Bids: ${auctionSummary.bid_count}`,
+                `🔓 Release Price: ${reminderAuction?.reserve_price ? `SGD ${formatAmount(reminderAuction.reserve_price)}` : 'N.A.'}`,
+                `🛒 Buyout Price: ${reminderAuction?.buy_it_now_price ? `SGD ${formatAmount(reminderAuction.buy_it_now_price)}` : 'N.A.'}`,
+                `⌛ Ending in ${reminder.label}!`,
+                `🔗 <a href="${productUrl}">Submit Your Bid Here</a>`,
+              ].join("\n");
+
+              // Short reminder message
+              const reminderMessageShort = [
+                `⏰ ${productTitle} ending in ${reminder.label}!`,
+                `💰 Current Bid: SGD ${formatAmount(auctionSummary.highest_bid)}`,
+                `🔓 RP: ${reminderAuction?.reserve_price ? `SGD ${formatAmount(reminderAuction.reserve_price)}` : 'N.A.'}`,
+                `🔗 <a href="${productUrl}">Submit Your Bid Here</a>`,
+              ].join("\n");
 
               await axios.post(
                 `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
                 { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: reminderMessage, parse_mode: "HTML" }
+              );
+
+              await axios.post(
+                `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+                { chat_id: CHAT_ID, message_thread_id: THREAD_ID_SHORT, text: reminderMessageShort, parse_mode: "HTML" }
               );
 
               console.log(`✅ ${reminder.label} reminder sent for "${productTitle}"`);
@@ -208,19 +229,32 @@ async function checkForNewBids() {
               "",
               `📦 Item: ${productTitle}`,
               `🏆 Winner: ${winner ? `${winner.customer_first_name[0]}${'*'.repeat(winner.customer_first_name.length - 1)} ${winner.customer_last_name[0]}${'*'.repeat(winner.customer_last_name.length - 1)}` : 'No bids'}`,
-              `💰 Winning Bid: ${winner ? `${winner.currency} ${auction.highest_bid}` : '-'}`,
+              `💰 Winning Bid: ${winner ? `${winner.currency} ${formatAmount(auction.highest_bid)}` : '-'}`,
               `🏁 Total Bids: ${auction.bid_count}`,
-              `🔓 Release Price: ${auction.reserve_price ? `${winner ? winner.currency : 'SGD'} ${auction.reserve_price}` : 'N.A.'}`,
+              `🔓 Release Price: ${auction.reserve_price ? `${winner ? winner.currency : 'SGD'} ${formatAmount(auction.reserve_price)}` : 'N.A.'}`,
               ...(reserveNotMet ? [
                 "",
-                `⚠️ The current bid has not met the Release Price of ${winner.currency} ${auction.reserve_price}.`,
+                `⚠️ The current bid has not met the Release Price of ${winner.currency} ${formatAmount(auction.reserve_price)}.`,
                 `We will get back to the current winner if the seller is fine to let go at the current bid price.`,
               ] : []),
+            ].join("\n");
+
+            // Short ended message
+            const endMessageShort = [
+              `🏁 ${productTitle} has ended!`,
+              `🏆 Winner: ${winner ? `${winner.customer_first_name[0]}${'*'.repeat(winner.customer_first_name.length - 1)} ${winner.customer_last_name[0]}${'*'.repeat(winner.customer_last_name.length - 1)}` : 'No bids'}`,
+              `💰 Winning Bid: ${winner ? `${winner.currency} ${formatAmount(auction.highest_bid)}` : '-'}`,
+              `🔓 RP: ${auction.reserve_price ? `${winner ? winner.currency : 'SGD'} ${formatAmount(auction.reserve_price)}` : 'N.A.'}`,
             ].join("\n");
 
             await axios.post(
               `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
               { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: endMessage }
+            );
+
+            await axios.post(
+              `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+              { chat_id: CHAT_ID, message_thread_id: THREAD_ID_SHORT, text: endMessageShort }
             );
 
             console.log(`✅ Auction ended: "${productTitle}"`);
@@ -255,19 +289,32 @@ async function checkForNewBids() {
               "🔨 NEW BID PLACED!",
               "",
               `📦 Item: ${productTitle}`,
-              `👤 Bidder: ${latestBid.customer_first_name[0]}${'*'.repeat(latestBid.customer_first_name.length - 1)} ${latestBid.customer_last_name[0]}${'*'.repeat(latestBid.customer_last_name.length - 1)}`,
-              `💰 Previous Bid: ${latestBid.currency} ${secondLatestBid ? secondLatestBid.bid : '-'}`,
-              `📈 Current Bid: ${latestBid.currency} ${auction.highest_bid}`,
+              `👤 Bidder: ${latestBid.customer_first_name[0]}${'*'.repeat(Math.max(latestBid.customer_first_name.length - 1, 1))} ${latestBid.customer_last_name[0]}${'*'.repeat(Math.max(latestBid.customer_last_name.length - 1, 1))}`,
+              `💰 Previous Bid: ${latestBid.currency} ${secondLatestBid ? formatAmount(secondLatestBid.bid) : '-'}`,
+              `📈 Current Bid: ${latestBid.currency} ${formatAmount(auction.highest_bid)}`,
               `🏁 Total Bids: ${auction.bid_count}`,
-              `🔓 Release Price: ${auction.reserve_price ? `${latestBid.currency} ${auction.reserve_price}` : 'N.A.'}`,
-              `🛒 Buyout Price: ${auction.buy_it_now_price ? `${latestBid.currency} ${auction.buy_it_now_price}` : 'N.A.'}`,
+              `🔓 Release Price: ${auction.reserve_price ? `${latestBid.currency} ${formatAmount(auction.reserve_price)}` : 'N.A.'}`,
+              `🛒 Buyout Price: ${auction.buy_it_now_price ? `${latestBid.currency} ${formatAmount(auction.buy_it_now_price)}` : 'N.A.'}`,
               `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
+              `🔗 <a href="${bidProductUrl}">Submit Your Bid Here</a>`,
+            ].join("\n");
+
+            // Short bid message
+            const messageShort = [
+              `🔨 New bid on ${productTitle}`,
+              `💰 Bid: ${latestBid.currency} ${formatAmount(auction.highest_bid)}`,
+              `🔓 RP: ${auction.reserve_price ? `${latestBid.currency} ${formatAmount(auction.reserve_price)}` : 'N.A.'}`,
               `🔗 <a href="${bidProductUrl}">Submit Your Bid Here</a>`,
             ].join("\n");
 
             await axios.post(
               `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
               { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: message, parse_mode: "HTML" }
+            );
+
+            await axios.post(
+              `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+              { chat_id: CHAT_ID, message_thread_id: THREAD_ID_SHORT, text: messageShort, parse_mode: "HTML" }
             );
 
             console.log(`✅ New bid on "${productTitle}"`);
