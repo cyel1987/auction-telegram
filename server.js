@@ -15,6 +15,7 @@ const endedAuctions = new Set();
 const notifiedNewAuctions = new Set();
 const sentReminders = {};
 const auctionEndDates = {};
+const newAuctionNotifiedDates = {};
 let initialized = false;
 
 async function getShopifyProductInfo(productId) {
@@ -93,8 +94,11 @@ async function checkForNewBids() {
           const isAuctionDay = sgtDay === "Monday" || sgtDay === "Wednesday";
           const isAuctionTime = isAuctionDay && sgtHour === 10 && sgtMinute === 0;
 
-          if (isAuctionTime) {
-            notifiedNewAuctions.add(productId);
+          const todayDate = new Date().toLocaleDateString("en-SG", { timeZone: "Asia/Singapore" });
+          const alreadyNotifiedToday = newAuctionNotifiedDates[productId] === todayDate;
+
+          if (isAuctionTime && !alreadyNotifiedToday) 
+            newAuctionNotifiedDates[productId] = todayDate;
             try {
               const shopifyInfo = await getShopifyProductInfo(productId);
               const productUrl = shopifyInfo ? `https://www.geekster.sg/products/${shopifyInfo.handle}` : 'https://www.geekster.sg/collections/auctions';
