@@ -167,9 +167,9 @@ async function checkForNewBids() {
               );
               const reminderAuction = detailReminderRes.data.auction;
               const reminderBids = detailReminderRes.data.auction_bids || [];
-              const sortedReminderBids = reminderBids.sort((a, b) => new Date(a.bid_date) - new Date(b.bid_date));
-              const currentLeader = sortedReminderBids[sortedReminderBids.length - 1];
-
+              const sortedReminderBids = reminderBids.sort((a, b) => parseFloat(b.bid) - parseFloat(a.bid));
+          const currentLeader = sortedReminderBids[0];
+              
               const reminderMessage = [
                 "⏰ AUCTION ENDING SOON!",
                 "",
@@ -221,8 +221,8 @@ async function checkForNewBids() {
           const bids = detailRes.data.auction_bids || [];
 
           if (auction) {
-            const sortedBids = bids.sort((a, b) => new Date(a.bid_date) - new Date(b.bid_date));
-            const winner = sortedBids[sortedBids.length - 1];
+            const sortedBids = bids.sort((a, b) => parseFloat(b.bid) - parseFloat(a.bid));
+          const winner = sortedBids[0];
 
             if (winner) hasWinner = true;
 
@@ -278,9 +278,9 @@ async function checkForNewBids() {
           );
           const auction = detailRes.data.auction;
           const bids = detailRes.data.auction_bids || [];
-          const sortedBids = bids.sort((a, b) => new Date(a.bid_date) - new Date(b.bid_date));
-          const latestBid = sortedBids[sortedBids.length - 1];
-          const secondLatestBid = sortedBids[sortedBids.length - 2];
+          const sortedBids = bids.sort((a, b) => parseFloat(b.bid) - parseFloat(a.bid));
+          const latestBid = sortedBids[0];
+          const secondLatestBid = sortedBids[1];
 
           bidCounts[productId] = auction.bid_count;
 
