@@ -83,60 +83,61 @@ async function checkForNewBids() {
       if (bidCounts[productId] === undefined) {
         bidCounts[productId] = auctionSummary.bid_count;
         sentReminders[productId] = [];
-
         if (hasEnded) {
           endedAuctions.add(productId);
           notifiedNewAuctions.add(productId);
-        } else if (!notifiedNewAuctions.has(productId)) {
-          const sgtHour = parseInt(new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", hour: "numeric", hour12: false }));
-          const sgtMinute = parseInt(new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", minute: "numeric" }));
-          const sgtDay = new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", weekday: "long" });
-          const isAuctionDay = sgtDay === "Monday" || sgtDay === "Wednesday";
-          const isAuctionTime = isAuctionDay && sgtHour === 10 && sgtMinute === 0;
-
-          const todayDate = new Date().toLocaleDateString("en-SG", { timeZone: "Asia/Singapore" });
-          const alreadyNotifiedToday = newAuctionNotifiedDates[productId] === todayDate;
-
-          if (isAuctionTime && !alreadyNotifiedToday) 
-            newAuctionNotifiedDates[productId] = todayDate;
-            try {
-              const shopifyInfo = await getShopifyProductInfo(productId);
-              const productUrl = shopifyInfo ? `https://www.geekster.sg/products/${shopifyInfo.handle}` : 'https://www.geekster.sg/collections/auctions';
-
-              const detailRes = await axios.get(
-                `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
-                { headers: { Authorization: `Bearer ${API_KEY}` } }
-              );
-              const auction = detailRes.data.auction;
-
-              if (auction) {
-                const newAuctionMessage = [
-                  "🆕 NEW AUCTION LISTED!",
-                  "",
-                  `📦 Item: ${productTitle}`,
-                  `💰 Starting Price: ${auctionSummary.starting_price ? `SGD ${formatAmount(auctionSummary.starting_price)}` : 'N.A.'}`,
-                  `🔓 Release Price: ${auction.reserve_price ? `SGD ${formatAmount(auction.reserve_price)}` : 'N.A.'}`,
-                  `🛒 Buyout Price: ${auction.buy_it_now_price ? `SGD ${formatAmount(auction.buy_it_now_price)}` : 'N.A.'}`,
-                  `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
-                  `🔗 <a href="${productUrl}">Submit Your Bid Here</a>`,
-                ].join("\n");
-
-                await axios.post(
-                  `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-                  { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: newAuctionMessage, parse_mode: "HTML" }
-                );
-
-                console.log(`✅ New auction listed: "${productTitle}"`);
-              }
-            } catch (e) {
-              console.log(`❌ Error sending new auction notification: ${e.message}`);
-            }
-          } else {
-            notifiedNewAuctions.add(productId);
-            console.log(`⏳ New auction "${productTitle}" detected but not auction time. Skipping.`);
-          }
         }
         continue;
+      }
+
+      // New auction listing notification at 10am on Mon/Wed
+      if (!notifiedNewAuctions.has(productId) && !hasEnded) {
+        const sgtHour = parseInt(new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", hour: "numeric", hour12: false }));
+        const sgtMinute = parseInt(new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", minute: "numeric" }));
+        const sgtDay = new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", weekday: "long" });
+        const isAuctionDay = sgtDay === "Monday" || sgtDay === "Wednesday";
+        const isAuctionTime = isAuctionDay && sgtHour === 10 && sgtMinute === 0;
+        const todayDate = new Date().toLocaleDateString("en-SG", { timeZone: "Asia/Singapore" });
+        const alreadyNotifiedToday = newAuctionNotifiedDates[productId] === todayDate;
+
+        if (isAuctionTime && !alreadyNotifiedToday) {
+          notifiedNewAuctions.add(productId);
+          newAuctionNotifiedDates[productId] = todayDate;
+          try {
+            const shopifyInfo = await getShopifyProductInfo(productId);
+            const productUrl = shopifyInfo ? `https://www.geekster.sg/products/${shopifyInfo.handle}` : 'https://www.geekster.sg/collections/auctions';
+
+            const detailRes = await axios.get(
+              `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
+              { headers: { Authorization: `Bearer ${API_KEY}` } }
+            );
+            const auction = detailRes.data.auction;
+
+            if (auction) {
+              const newAuctionMessage = [
+                "🆕 NEW AUCTION LISTED!",
+                "",
+                `📦 Item: ${productTitle}`,
+                `💰 Starting Price: ${auctionSummary.starting_price ? `SGD ${formatAmount(auctionSummary.starting_price)}` : 'N.A.'}`,
+                `🔓 Release Price: ${auction.reserve_price ? `SGD ${formatAmount(auction.reserve_price)}` : 'N.A.'}`,
+                `🛒 Buyout Price: ${auction.buy_it_now_price ? `SGD ${formatAmount(auction.buy_it_now_price)}` : 'N.A.'}`,
+                `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
+                `🔗 <a href="${productUrl}">Submit Your Bid Here</a>`,
+              ].join("\n");
+
+              await axios.post(
+                `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+                { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: newAuctionMessage, parse_mode: "HTML" }
+              );
+
+              console.log(`✅ New auction listed: "${productTitle}"`);
+            }
+          } catch (e) {
+            console.log(`❌ Error sending new auction notification: ${e.message}`);
+          }
+        } else if (!isAuctionTime) {
+          console.log(`⏳ New auction "${productTitle}" detected but not auction time. Skipping.`);
+        }
       }
 
       // Send reminders before auction ends
@@ -182,7 +183,6 @@ async function checkForNewBids() {
                 `🔗 <a href="${productUrl}">Submit Your Bid Here</a>`,
               ].join("\n");
 
-              // Short reminder message
               const reminderMessageShort = [
                 `⏰ ${productTitle} ending in ${reminder.label}!`,
                 `💰 Current Bid: SGD ${formatAmount(auctionSummary.highest_bid)}`,
@@ -243,7 +243,6 @@ async function checkForNewBids() {
               ] : []),
             ].join("\n");
 
-            // Short ended message
             const endMessageShort = [
               `🏁 ${productTitle} has ended!`,
               `🏆 Winner: ${winner ? `${winner.customer_first_name[0]}${'*'.repeat(winner.customer_first_name.length - 1)} ${winner.customer_last_name[0]}${'*'.repeat(winner.customer_last_name.length - 1)}` : 'No bids'}`,
@@ -303,7 +302,6 @@ async function checkForNewBids() {
               `🔗 <a href="${bidProductUrl}">Submit Your Bid Here</a>`,
             ].join("\n");
 
-            // Short bid message
             const messageShort = [
               `🔨 New bid on ${productTitle}`,
               `💰 Bid: ${latestBid.currency} ${formatAmount(auction.highest_bid)}`,
