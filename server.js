@@ -126,9 +126,9 @@ async function checkForNewBids() {
               ].join("\n");
 
               await axios.post(
-              `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-              { chat_id: CHAT_ID, message_thread_id: THREAD_ID_SHORT, text: messageShort, parse_mode: "HTML", link_preview_options: { is_disabled: true } }
-            );
+                `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+                { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: newAuctionMessage, parse_mode: "HTML" }
+              );
 
               console.log(`✅ New auction listed: "${productTitle}"`);
             }
@@ -197,7 +197,7 @@ async function checkForNewBids() {
 
               await axios.post(
                 `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-                { chat_id: CHAT_ID, message_thread_id: THREAD_ID_SHORT, text: reminderMessageShort, parse_mode: "HTML" }
+                { chat_id: CHAT_ID, message_thread_id: THREAD_ID_SHORT, text: reminderMessageShort, parse_mode: "HTML", disable_web_page_preview: true }
               );
 
               console.log(`✅ ${reminder.label} reminder sent for "${productTitle}"`);
@@ -257,7 +257,7 @@ async function checkForNewBids() {
 
             await axios.post(
               `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-              { chat_id: CHAT_ID, message_thread_id: THREAD_ID_SHORT, text: endMessageShort }
+              { chat_id: CHAT_ID, message_thread_id: THREAD_ID_SHORT, text: endMessageShort, disable_web_page_preview: true }
             );
 
             console.log(`✅ Auction ended: "${productTitle}"`);
@@ -309,7 +309,6 @@ async function checkForNewBids() {
               `🔓 RP: ${auction.reserve_price ? `${latestBid.currency} ${formatAmount(auction.reserve_price)}` : 'N.A.'}`,
               `🔗 <a href="${bidProductUrl}">Submit Your Bid Here</a>`,
             ].join("\n");
-            link_preview_options: { is_disabled: true }
 
             await axios.post(
               `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
@@ -318,7 +317,7 @@ async function checkForNewBids() {
 
             await axios.post(
               `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-              { chat_id: CHAT_ID, message_thread_id: THREAD_ID_SHORT, text: messageShort, parse_mode: "HTML" }
+              { chat_id: CHAT_ID, message_thread_id: THREAD_ID_SHORT, text: messageShort, parse_mode: "HTML", disable_web_page_preview: true }
             );
 
             console.log(`✅ New bid on "${productTitle}"`);
