@@ -1,5 +1,28 @@
 const express = require("express");
 const axios = require("axios");
+const nodemailer = require("nodemailer");
+
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_PASS,
+  }
+});
+
+async function sendEmailNotification(subject, body) {
+  try {
+    await transporter.sendMail({
+      from: process.env.GMAIL_USER,
+      to: process.env.NOTIFY_EMAIL,
+      subject: subject,
+      text: body
+    });
+    console.log(`✅ Email sent: ${subject}`);
+  } catch (e) {
+    console.log(`❌ Email error: ${e.message}`);
+  }
+}
 const app = express();
 app.use(express.json());
 
@@ -284,6 +307,27 @@ async function checkForNewBids() {
 
           bidCounts[productId] = auction.bid_count;
 
+          // Check for autobids and send email
+          const autoBids = detailRes.data.automatic_bids || [];
+          if (autoBids.length > 0) {
+            const sortedAutoBids = autoBids.sort((a, b) => parseFloat(b.bid) - parseFloat(a.bid));
+            const topAutoBid = sortedAutoBids[0];
+            const emailBody = [
+              `🤖 AUTOBID ALERT`,
+              ``,
+              `Item: ${productTitle}`,
+              `Bidder: ${topAutoBid.customer_first_name} ${topAutoBid.customer_last_name}`,
+              `Email: ${topAutoBid.customer_email}`,
+              `Max Autobid: ${topAutoBid.currency} ${topAutoBid.bid}`,
+              `Current Highest Bid: ${topAutoBid.currency} ${auction.highest_bid}`,
+              `Total Bids: ${auction.bid_count}`,
+            ].join("\n");
+
+            await sendEmailNotification(
+              `🤖 Autobid Alert - ${productTitle}`,
+              emailBody
+            );
+          }
           const bidShopifyInfo = await getShopifyProductInfo(productId);
           const bidProductUrl = bidShopifyInfo ? `https://www.geekster.sg/products/${bidShopifyInfo.handle}` : 'https://www.geekster.sg/collections/auctions';
 
