@@ -242,3 +242,227 @@ async function checkForNewBids() {
                 "⏰ AUCTION ENDING SOON!",
                 "",
                 `📦 Item: ${productTitle}`,
+                `📈 Current Bid: SGD ${formatAmount(auctionSummary.highest_bid)}`,
+                `👤 Current Bidder: ${currentLeader ? `${currentLeader.customer_first_name[0]}${'*'.repeat(Math.max(currentLeader.customer_first_name.length - 1, 1))} ${currentLeader.customer_last_name[0]}${'*'.repeat(Math.max(currentLeader.customer_last_name.length - 1, 1))}` : 'No bids yet'}`,
+                `🏁 Total Bids: ${auctionSummary.bid_count}`,
+                `🔓 Release Price: ${reminderAuction?.reserve_price ? `SGD ${formatAmount(reminderAuction.reserve_price)}` : 'N.A.'}`,
+                `🛒 Buyout Price: ${reminderAuction?.buy_it_now_price ? `SGD ${formatAmount(reminderAuction.buy_it_now_price)}` : 'N.A.'}`,
+                `⌛ Ending in ${reminder.label}!`,
+                `🔗 <a href="${productUrl}">Submit Your Bid Here</a>`,
+              ].join("\n");
+
+              const reminderMessageShort = [
+                `⏰ ${productTitle} ending in ${reminder.label}!`,
+                `💰 Current Bid: SGD ${formatAmount(auctionSummary.highest_bid)}`,
+                `🔓 RP: ${reminderAuction?.reserve_price ? `SGD ${formatAmount(reminderAuction.reserve_price)}` : 'N.A.'}`,
+                `🔗 <a href="${productUrl}">Submit Your Bid Here</a>`,
+              ].join("\n");
+
+              await axios.post(
+                `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+                { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: reminderMessage, parse_mode: "HTML" }
+              );
+
+              await axios.post(
+                `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+                { chat_id: CHAT_ID, message_thread_id: THREAD_ID_SHORT, text: reminderMessageShort, parse_mode: "HTML", disable_web_page_preview: true }
+              );
+
+              console.log(`✅ ${reminder.label} reminder sent for "${productTitle}"`);
+            } catch (e) {
+              console.log(`❌ Error sending reminder: ${e.message}`);
+            }
+          }
+        }
+      }
+
+      // Auction just ended
+      if (hasEnded && !endedAuctions.has(productId)) {
+        endedAuctions.add(productId);
+
+        try {
+          const detailRes = await axios.get(
+            `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
+            { headers: { Authorization: `Bearer ${API_KEY}` } }
+          );
+          const auction = detailRes.data.auction;
+          const bids = detailRes.data.auction_bids || [];
+
+          if (auction) {
+            const sortedBids = bids.sort((a, b) => parseFloat(b.bid) - parseFloat(a.bid));
+            const winner = sortedBids[0];
+
+            if (winner) hasWinner = true;
+
+            const reserveNotMet = auction.reserve_price && parseFloat(auction.highest_bid) < parseFloat(auction.reserve_price);
+
+            const endMessage = [
+              "🏁 AUCTION ENDED!",
+              "",
+              `📦 Item: ${productTitle}`,
+              `🏆 Winner: ${winner ? `${winner.customer_first_name[0]}${'*'.repeat(winner.customer_first_name.length - 1)} ${winner.customer_last_name[0]}${'*'.repeat(winner.customer_last_name.length - 1)}` : 'No bids'}`,
+              `💰 Winning Bid: ${winner ? `${winner.currency} ${formatAmount(auction.highest_bid)}` : '-'}`,
+              `🏁 Total Bids: ${auction.bid_count}`,
+              `🔓 Release Price: ${auction.reserve_price ? `${winner ? winner.currency : 'SGD'} ${formatAmount(auction.reserve_price)}` : 'N.A.'}`,
+              ...(reserveNotMet ? [
+                "",
+                `⚠️ The current bid has not met the Release Price of ${winner.currency} ${formatAmount(auction.reserve_price)}.`,
+                `We will get back to the current winner if the seller is fine to let go at the current bid price.`,
+              ] : []),
+            ].join("\n");
+
+            const endMessageShort = [
+              `🏁 ${productTitle} has ended!`,
+              `🏆 Winner: ${winner ? `${winner.customer_first_name[0]}${'*'.repeat(winner.customer_first_name.length - 1)} ${winner.customer_last_name[0]}${'*'.repeat(winner.customer_last_name.length - 1)}` : 'No bids'}`,
+              `💰 Winning Bid: ${winner ? `${winner.currency} ${formatAmount(auction.highest_bid)}` : '-'}`,
+              `🔓 RP: ${auction.reserve_price ? `${winner ? winner.currency : 'SGD'} ${formatAmount(auction.reserve_price)}` : 'N.A.'}`,
+            ].join("\n");
+
+            await axios.post(
+              `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+              { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: endMessage }
+            );
+
+            await axios.post(
+              `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+              { chat_id: CHAT_ID, message_thread_id: THREAD_ID_SHORT, text: endMessageShort, disable_web_page_preview: true }
+            );
+
+            console.log(`✅ Auction ended: "${productTitle}"`);
+          }
+        } catch (e) {
+          console.log(`❌ Error sending ended notification: ${e.message}`);
+        }
+
+        continue;
+      }
+
+      // New bid placed
+      if (!hasEnded && auctionSummary.bid_count > bidCounts[productId]) {
+        try {
+          const detailRes = await axios.get(
+            `https://auction-api.tunnelpacket.com/api/auction/${productId}`,
+            { headers: { Authorization: `Bearer ${API_KEY}` } }
+          );
+          const auction = detailRes.data.auction;
+          const bids = detailRes.data.auction_bids || [];
+          const autoBids = detailRes.data.automatic_bids || [];
+          const sortedBids = bids.sort((a, b) => parseFloat(b.bid) - parseFloat(a.bid));
+          const latestBid = sortedBids[0];
+          const secondLatestBid = sortedBids[1];
+
+          bidCounts[productId] = auction.bid_count;
+
+          const bidShopifyInfo = await getShopifyProductInfo(productId);
+          const bidProductUrl = bidShopifyInfo ? `https://www.geekster.sg/products/${bidShopifyInfo.handle}` : 'https://www.geekster.sg/collections/auctions';
+
+          if (latestBid) {
+            const message = [
+              "🔨 NEW BID PLACED!",
+              "",
+              `📦 Item: ${productTitle}`,
+              `👤 Bidder: ${latestBid.customer_first_name[0]}${'*'.repeat(Math.max(latestBid.customer_first_name.length - 1, 1))} ${latestBid.customer_last_name[0]}${'*'.repeat(Math.max(latestBid.customer_last_name.length - 1, 1))}`,
+              `💰 Previous Bid: ${latestBid.currency} ${secondLatestBid ? formatAmount(secondLatestBid.bid) : '-'}`,
+              `📈 Current Bid: ${latestBid.currency} ${formatAmount(auction.highest_bid)}`,
+              `🏁 Total Bids: ${auction.bid_count}`,
+              `🔓 Release Price: ${auction.reserve_price ? `${latestBid.currency} ${formatAmount(auction.reserve_price)}` : 'N.A.'}`,
+              `🛒 Buyout Price: ${auction.buy_it_now_price ? `${latestBid.currency} ${formatAmount(auction.buy_it_now_price)}` : 'N.A.'}`,
+              `⏰ Ends: ${new Date(auction.end_date).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}`,
+              `🔗 <a href="${bidProductUrl}">Submit Your Bid Here</a>`,
+            ].join("\n");
+
+            const messageShort = [
+              `🔨 New bid on ${productTitle}`,
+              `👤 Bidder: ${latestBid.customer_first_name[0]}${'*'.repeat(Math.max(latestBid.customer_first_name.length - 1, 1))} ${latestBid.customer_last_name[0]}${'*'.repeat(Math.max(latestBid.customer_last_name.length - 1, 1))}`,
+              `💰 Bid: ${latestBid.currency} ${formatAmount(auction.highest_bid)}`,
+              `🔓 RP: ${auction.reserve_price ? `${latestBid.currency} ${formatAmount(auction.reserve_price)}` : 'N.A.'}`,
+              `🔗 <a href="${bidProductUrl}">Submit Your Bid Here</a>`,
+            ].join("\n");
+
+            // Admin private message with autobid info
+            let adminMessage = [
+              `🔨 NEW BID - ${productTitle}`,
+              ``,
+              `👤 Bidder: ${latestBid.customer_first_name} ${latestBid.customer_last_name}`,
+              `📧 Email: ${latestBid.customer_email}`,
+              `💰 Current Bid: ${latestBid.currency} ${formatAmount(auction.highest_bid)}`,
+              `🏁 Total Bids: ${auction.bid_count}`,
+            ].join("\n");
+
+            if (autoBids.length > 0) {
+              const sortedAutoBids = autoBids.sort((a, b) => parseFloat(b.bid) - parseFloat(a.bid));
+              adminMessage += "\n\n🤖 AUTOBID INFO\n";
+              for (const ab of sortedAutoBids) {
+                adminMessage += `👤 ${ab.customer_first_name} ${ab.customer_last_name} (${ab.customer_email}) | Max: ${ab.currency} ${formatAmount(ab.bid)}\n`;
+              }
+            } else {
+              adminMessage += "\n\n🤖 No autobids placed.";
+            }
+
+            await axios.post(
+              `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+              { chat_id: CHAT_ID, message_thread_id: THREAD_ID, text: message, parse_mode: "HTML" }
+            );
+
+            await axios.post(
+              `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+              { chat_id: CHAT_ID, message_thread_id: THREAD_ID_SHORT, text: messageShort, parse_mode: "HTML", disable_web_page_preview: true }
+            );
+
+            await sendAdminMessage(adminMessage);
+
+            console.log(`✅ New bid on "${productTitle}"`);
+          }
+        } catch (e) {
+          console.log(`❌ Error sending bid notification: ${e.message}`);
+        }
+      } else if (!hasEnded) {
+        console.log(`No new bids on "${productTitle}". Total: ${auctionSummary.bid_count}`);
+      }
+    }
+
+    // Send ONE PayNow QR code if any auction ended with a winner
+    if (hasWinner) {
+      await axios.post(
+        `https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`,
+        {
+          chat_id: CHAT_ID,
+          message_thread_id: THREAD_ID,
+          photo: "https://github.com/cyel1987/auction-telegram/blob/main/PayNow.PNG?raw=true",
+          caption: "💳 Please make payment via PayNow QR Code."
+        }
+      );
+    }
+
+    console.log("🔁 Check complete.");
+
+  } catch (err) {
+    console.log("❌ Error:", err.message);
+    console.log("❌ Stack:", err.stack);
+  }
+}
+
+setInterval(checkForNewBids, 10000);
+checkForNewBids();
+
+// Set up Telegram webhook for /autobid command
+async function setWebhook() {
+  try {
+    await axios.post(
+      `https://api.telegram.org/bot${BOT_TOKEN}/setWebhook`,
+      { url: `https://auction-telegram.onrender.com/telegram-webhook` }
+    );
+    console.log("✅ Webhook set successfully");
+  } catch (e) {
+    console.log(`❌ Webhook error: ${e.message}`);
+  }
+}
+
+app.get("/", (req, res) => {
+  res.send("Auction bot is running!");
+});
+
+app.listen(3000, () => {
+  console.log("🚀 Server running on port 3000");
+  setWebhook();
+});
